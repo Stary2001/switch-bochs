@@ -1527,3 +1527,10 @@ void CDECL bx_signal_handler(int signum)
 
   BX_PANIC(("SIGNAL %u caught", signum));
 }
+
+
+
+int access(const char *pathname, int mode)
+{
+    return 0;
+}

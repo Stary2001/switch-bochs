@@ -641,6 +641,22 @@ BX_CPP_INLINE Bit64u bx_bswap64(Bit64u val64)
 #define BX_FINI_MUTEX(mutex) DeleteCriticalSection(&(mutex))
 #define BX_MSLEEP(val) Sleep(val)
 #else
+
+#ifdef SWITCH
+#include <switch.h>
+#define BX_THREAD_ID(id) Thread (id)
+#define BX_THREAD_FUNC(name,arg) void name(void* arg)
+#define BX_THREAD_EXIT svcExitThread();
+#define BX_THREAD_CREATE(name,arg,id) \
+    pthread_create(&(id), NULL, (void *(*)(void *))&(name), arg)
+#define BX_LOCK(mutex) mutexLock(&(mutex));
+#define BX_UNLOCK(mutex) mutexUnlock(&(mutex));
+#define BX_MUTEX(mutex) Mutex (mutex)
+#define BX_INIT_MUTEX(mutex) mutexInit(&(mutex))
+#define BX_FINI_MUTEX(mutex)
+#define BX_MSLEEP(val) svcSleepThread(val*1000)
+
+#else
 #define BX_THREAD_ID(id) pthread_t (id)
 #define BX_THREAD_FUNC(name,arg) void name(void* arg)
 #define BX_THREAD_EXIT pthread_exit(NULL)
@@ -652,6 +668,7 @@ BX_CPP_INLINE Bit64u bx_bswap64(Bit64u val64)
 #define BX_INIT_MUTEX(mutex) pthread_mutex_init(&(mutex),NULL)
 #define BX_FINI_MUTEX(mutex) pthread_mutex_destroy(&(mutex))
 #define BX_MSLEEP(val) usleep(val*1000)
+#endif
 #endif
 
 #endif  /* BX_BOCHS_H */
