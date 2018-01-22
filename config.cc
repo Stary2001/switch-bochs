@@ -937,6 +937,9 @@ void bx_init_options()
 #if BX_WITH_NOGUI
     "nogui",
 #endif
+#if BX_WITH_SWITCH
+    "switch",
+#endif
     NULL
   };
   bx_param_enum_c *sel_displaylib = new bx_param_enum_c(display,

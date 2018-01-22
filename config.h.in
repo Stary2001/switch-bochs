@@ -291,6 +291,7 @@
 #define BX_WITH_SDL2 0
 #define BX_WITH_SVGA 0
 #define BX_WITH_WX 0
+#define BX_WITH_SWITCH 0
 
 // BX_USE_TEXTCONFIG should be set to 1 unless Bochs is compiled
 // for wxWidgets only.

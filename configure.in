@@ -107,6 +107,7 @@ if (test "$with_sdl" != yes) && \
    (test "$with_amigaos" != yes) && \
    (test "$with_carbon" != yes) && \
    (test "$with_wx" != yes) && \
+   (test "$with_switch" != yes) && \
    (test "$with_macos" != yes); then
   # use DEFAULT_GUI.  Set the appropriate variable.
   # DEFAULT_GUI must be set to one of the names above.  Otherwise, no
@@ -2239,6 +2240,10 @@ AC_ARG_WITH(wx,
   [  --with-wx                         use wxWidgets libraries],
   )
 
+AC_ARG_WITH(switch,
+  [  --with(switch                     use Switch libraries],
+  )
+
 AC_ARG_WITH(all-libs,
   [  --with-all-libs                   compile all guis that Bochs supports],
   )
@@ -2611,6 +2616,15 @@ if test "$with_nogui" = yes; then
   GUI_DLL_TARGETS="$GUI_DLL_TARGETS bx_nogui.dll"
   AC_DEFINE(BX_WITH_NOGUI, 1)
   SPECIFIC_GUI_OBJS="$SPECIFIC_GUI_OBJS \$(GUI_OBJS_NOGUI)"
+fi
+
+if test "$with_switch" = yes; then
+  display_libs="$display_libs switch"
+  GUI_DLL_TARGETS="$GUI_DLL_TARGETS bx_switch.dll"
+  AC_DEFINE(BX_WITH_SWITCH, 1)
+  AC_DEFINE(BX_DEFAULT_DISPLAY_LIBRARY, "switch")
+  SPECIFIC_GUI_OBJS="$SPECIFIC_GUI_OBJS \$(GUI_OBJS_SWITCH)"
+  EXTRA_LINK_OPTS="-lnx"
 fi
 
 AC_MSG_CHECKING(for display libraries)
