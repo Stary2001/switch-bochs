@@ -1508,6 +1508,7 @@ bx_bool vvfat_image_t::write_file(const char *path, direntry_t *entry, bx_bool c
   ::close(fd);
 
 #ifndef WIN32
+#ifndef SWITCH
   tv.tm_year = (entry->mdate >> 9) + 80;
   tv.tm_mon = ((entry->mdate >> 5) & 0x0f) - 1;
   tv.tm_mday = entry->mdate & 0x1f;
@@ -1528,6 +1529,7 @@ bx_bool vvfat_image_t::write_file(const char *path, direntry_t *entry, bx_bool c
     ut.actime = ut.modtime;
   }
   utime(path, &ut);
+#endif
 #else
   hFile = CreateFile(path, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
   if (hFile != INVALID_HANDLE_VALUE) {

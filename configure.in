@@ -219,6 +219,7 @@ else
 fi
 AC_CHECK_FUNCS(sleep, AC_DEFINE(BX_HAVE_SLEEP))
 AC_CHECK_FUNCS(nanosleep, AC_DEFINE(BX_HAVE_NANOSLEEP))
+AC_CHECK_FUNCS(svcSleepThread, AC_DEFINE(BX_HAVE_SLEEPTHREAD))
 AC_CHECK_FUNCS(abort, AC_DEFINE(BX_HAVE_ABORT))
 AC_CHECK_MEMBER(struct sockaddr_in.sin_len, AC_DEFINE(BX_HAVE_SOCKADDR_IN_SIN_LEN), , [#include <sys/socket.h>
 #include <netinet/in.h> ])
@@ -2241,7 +2242,7 @@ AC_ARG_WITH(wx,
   )
 
 AC_ARG_WITH(switch,
-  [  --with(switch                     use Switch libraries],
+  [  --with-switch                     use Switch libraries],
   )
 
 AC_ARG_WITH(all-libs,

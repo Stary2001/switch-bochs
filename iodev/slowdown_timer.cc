@@ -29,6 +29,10 @@
 #include <unistd.h>
 #endif
 
+#if BX_HAVE_SLEEPTHREAD
+#include <switch/kernel/svc.h>
+#endif
+
 //These need to stay printfs because they are useless in the log file.
 #define BX_SLOWDOWN_PRINTF_FEEDBACK 0
 
@@ -146,6 +150,8 @@ void bx_slowdown_timer_c::handle_timer()
     msleep(usectomsec((Bit32u)s.Q));
 #elif BX_HAVE_SLEEP
     sleep(usectosec(s.Q));
+#elif BX_HAVE_SLEEPTHREAD
+    svcSleepThread(s.Q * 1000ULL);
 #else
 #error do not know have to sleep
 #endif    //delay(wanttime-totaltime);

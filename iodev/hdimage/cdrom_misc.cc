@@ -98,7 +98,9 @@ extern "C" {
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef SWITCH
 #include <sys/ioctl.h>
+#endif
 #define BX_CD_FRAMESIZE 2048
 #define CD_FRAMESIZE 2048
 

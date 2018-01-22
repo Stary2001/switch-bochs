@@ -1,0 +1,15 @@
+*.a
+*.o
+bochs
+Makefile
+build/linux/bochs-dlx
+build/macosx/Info.plist
+build/win32/nsis/bochs.nsi
+bxversion.h
+bxversion.rc
+config.h
+config.log
+config.status
+libtool
+ltdlconf.h
+autom4te.cache
