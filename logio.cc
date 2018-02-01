@@ -250,14 +250,18 @@ void iofunctions::out(int level, const char *prefix, const char *fmt, va_list ap
     s++;
   }
 
-  fprintf(logfd,"%s ", msgpfx);
+  svcOutputDebugString(msgpfx, strlen(msgpfx));
+  //fprintf(logfd,"%s ", msgpfx);
 
   if(level==LOGLEV_PANIC)
-    fprintf(logfd, ">>PANIC<< ");
+    //fprintf(logfd, ">>PANIC<< ");
+    svcOutputDebugString(">>PANIC<< ", strlen(">>PANIC<< "));
 
   vsnprintf(msg, sizeof(msg), fmt, ap);
-  fprintf(logfd, "%s\n", msg);
-  fflush(logfd);
+  /*fprintf(logfd, "%s\n", msg);
+  fflush(logfd);*/
+
+  svcOutputDebugString(msg, strlen(msg));
   if (SIM->has_log_viewer()) {
     SIM->log_msg(msgpfx, level, msg);
   }
@@ -487,7 +491,9 @@ void logfunctions::warn(int level, const char *prefix, const char *fmt, va_list 
   static char in_warn_already = 0;
   char buf1[1024];
   if (in_warn_already) {
-    fprintf(stderr, "logfunctions::warn() should not reenter!!\n");
+    static const char *shouldnt_reenter = "logfunctions::warn() should not reenter!!\n";
+    svcOutputDebugString(shouldnt_reenter, strlen(shouldnt_reenter));
+    //fprintf(stderr, "logfunctions::warn() should not reenter!!\n");
     return;
   }
   in_warn_already = 1;
@@ -521,7 +527,9 @@ void logfunctions::ask(int level, const char *prefix, const char *fmt, va_list a
   static char in_ask_already = 0;
   char buf1[1024];
   if (in_ask_already) {
-    fprintf(stderr, "logfunctions::ask() should not reenter!!\n");
+    static const char *shouldnt_reenter = "logfunctions::ask() should not reenter!!\n";
+    svcOutputDebugString(shouldnt_reenter, strlen(shouldnt_reenter));
+    //fprintf(stderr, "logfunctions::ask() should not reenter!!\n");
     return;
   }
   in_ask_already = 1;
@@ -668,10 +676,17 @@ void logfunctions::fatal(int level, const char *prefix, const char *fmt, va_list
 #endif
   if (!SIM->is_wx_selected()) {
     static const char *divider = "========================================================================";
-    fprintf(stderr, "%s\n", divider);
+    static const char *bochs_is_exiting = "Bochs is exiting with the following message:\n";
+
+    svcOutputDebugString(divider, strlen(divider));
+    svcOutputDebugString(bochs_is_exiting, strlen(bochs_is_exiting));
+    svcOutputDebugString(exit_msg, strlen(exit_msg));
+    svcOutputDebugString(divider, strlen(divider));
+
+    /*fprintf(stderr, "%s\n", divider);
     fprintf(stderr, "Bochs is exiting with the following message:\n");
     fprintf(stderr, "%s", exit_msg);
-    fprintf(stderr, "\n%s\n", divider);
+    fprintf(stderr, "\n%s\n", divider);*/
   }
 #if !BX_DEBUGGER
   BX_EXIT(exit_status);
