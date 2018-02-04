@@ -2672,7 +2672,18 @@ if test "$display_libs" = " wxWidgets"; then
   AC_DEFINE(BX_DEFAULT_DISPLAY_LIBRARY, "wx")
   AC_DEFINE(BX_USE_TEXTCONFIG, 0)
 else
+dnl Do the same for switch..
+if test "$display_libs" = " switch"; then
+  AC_MSG_CHECKING(for default configuration interface)
+  AC_MSG_RESULT(switch)
+  AC_MSG_CHECKING(for default display library)
+  AC_MSG_RESULT(switch)
+  AC_DEFINE(BX_DEFAULT_CONFIG_INTERFACE, "switch")
+  AC_DEFINE(BX_DEFAULT_DISPLAY_LIBRARY, "switch")
+  AC_DEFINE(BX_USE_TEXTCONFIG, 0)
+else
   AC_DEFINE(BX_USE_TEXTCONFIG, 1)
+fi
 fi
 
 if test "$use_gui_console" = 1; then

@@ -25,6 +25,9 @@
 #if BX_USE_WIN32CONFIG
 #include "gui/win32dialog.h"
 #endif
+#if BX_WITH_SWITCH
+#include "gui/switchconfig.h"
+#endif
 #include "cpu/cpu.h"
 #include "iodev/iodev.h"
 
@@ -315,6 +318,7 @@ int bxmain(void)
       BX_INSTR_EXIT_ENV();
       return 0;
     }
+
     // read a param to decide which config interface to start.
     // If one exists, start it.  If not, just begin.
     bx_param_enum_c *ci_param = SIM->get_param_enum(BXPN_SEL_CONFIG_INTERFACE);
@@ -338,9 +342,15 @@ int bxmain(void)
       PLUG_load_gui_plugin("wx");
     }
 #endif
+#if BX_WITH_SWITCH
+    else if(!strcmp(ci_name, "switchconfig")) {
+      init_switch_config_interface();
+    }
+#endif
     else {
       BX_PANIC(("unsupported configuration interface '%s'", ci_name));
     }
+
     ci_param->set_enabled(0);
     int status = SIM->configuration_interface(ci_name, CI_START);
     if (status == CI_ERR_NO_TEXT_CONSOLE)

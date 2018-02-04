@@ -24979,8 +24979,25 @@ $as_echo "wxWidgets" >&6; }
   $as_echo "#define BX_USE_TEXTCONFIG 0" >>confdefs.h
 
 else
+if test "$display_libs" = " switch"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for default configuration interface" >&5
+$as_echo_n "checking for default configuration interface... " >&6; }
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: switch" >&5
+$as_echo "switch" >&6; }
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for default display library" >&5
+$as_echo_n "checking for default display library... " >&6; }
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: switch" >&5
+$as_echo "switch" >&6; }
+  $as_echo "#define BX_DEFAULT_CONFIG_INTERFACE \"switch\"" >>confdefs.h
+
+  $as_echo "#define BX_DEFAULT_DISPLAY_LIBRARY \"switch\"" >>confdefs.h
+
+  $as_echo "#define BX_USE_TEXTCONFIG 0" >>confdefs.h
+
+else
   $as_echo "#define BX_USE_TEXTCONFIG 1" >>confdefs.h
 
+fi
 fi
 
 if test "$use_gui_console" = 1; then
