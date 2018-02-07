@@ -25,9 +25,12 @@
 #if BX_USE_WIN32CONFIG
 #include "gui/win32dialog.h"
 #endif
+
 #if BX_WITH_SWITCH
+#include <switch.h>
 #include "gui/switchconfig.h"
 #endif
+
 #include "cpu/cpu.h"
 #include "iodev/iodev.h"
 
@@ -305,6 +308,12 @@ void print_statistics_tree(bx_param_c *node, int level)
 
 int bxmain(void)
 {
+#ifdef BX_WITH_SWITCH
+  gfxInitDefault();
+  consoleInit(NULL);
+  svcOutputDebugString("gfxInit!", strlen("gfxInit!"));
+  printf("Hi!\n");
+#endif
 #ifdef HAVE_LOCALE_H
   // Initialize locale (for isprint() and other functions)
   setlocale (LC_ALL, "");
@@ -369,6 +378,12 @@ int bxmain(void)
     char buf[16];
     fgets(buf, sizeof(buf), stdin);
   }
+#endif
+#ifdef BX_WITH_SWITCH
+  svcSleepThread(10e9);
+  svcOutputDebugString("gfxExit a!", strlen("gfxExit a!"));
+  gfxExit();
+  svcOutputDebugString("gfxExit b!", strlen("gfxExit b!"));
 #endif
   BX_INSTR_EXIT_ENV();
   return SIM->get_exit_code();

@@ -15,12 +15,9 @@ extern "C" {
 }
 #endif
 
-#define LOG_THIS genlog->
-
-#include "bochs.h"
+#include "siminterface.h"
 #include "osdep.h"
 #include "param_names.h"
-#include "textconfig.h"
 #include "switchconfig.h"
 
 #define CI_PATH_LENGTH 512
@@ -29,31 +26,129 @@ extern "C" {
 #define bx_printf SIM->bx_printf
 #define bx_fgets  SIM->bx_gets
 #else
-#define bx_printf bx_printf
-
-#include <stdarg.h>
-#include <switch.h>
-
-char bx_printf_buffer[2048];
-int bx_printf(const char *format, ...)
-{
-  va_list arg;
-  va_start(arg, format);
-  int i = vsnprintf(bx_printf_buffer, 2048, format, arg);
-  svcOutputDebugString(bx_printf_buffer, strlen(bx_printf_buffer));
-  va_end(arg);
-  return i;
-}
-
+#define bx_printf printf
 #define bx_fgets  fgets
 #endif
 
 #include <stdarg.h>
 #include <switch.h>
 
+
+static const char *startup_menu_prompt =
+"------------------------------\n"
+"Bochs Configuration: Main Menu\n"
+"------------------------------\n"
+"\n"
+"This is the Bochs Configuration Interface, where you can describe the\n"
+"machine that you want to simulate.  Bochs has already searched for a\n"
+"configuration file (typically called bochsrc.txt) and loaded it if it\n"
+"could be found.  When you are satisfied with the configuration, go\n"
+"ahead and start the simulation.\n"
+"\n"
+"You can also start bochs with the -q option to skip these menus.\n"
+"\n"
+"1. Restore factory default configuration\n"
+"2. Read options from...\n"
+"3. Edit options\n"
+"4. Save options to...\n"
+"5. Restore the Bochs state from...\n"
+"6. Begin simulation\n"
+"7. Quit now\n"
+"\n"
+"Please choose one: [%d] ";
+
+static const char *startup_options_prompt =
+"------------------\n"
+"Bochs Options Menu\n"
+"------------------\n"
+"0. Return to previous menu\n"
+"1. Optional plugin control\n"
+"2. Logfile options\n"
+"3. Log options for all devices\n"
+"4. Log options for individual devices\n"
+"5. CPU options\n"
+"6. CPUID options\n"
+"7. Memory options\n"
+"8. Clock & CMOS options\n"
+"9. PCI options\n"
+"10. Bochs Display & Interface options\n"
+"11. Keyboard & Mouse options\n"
+"12. Disk & Boot options\n"
+"13. Serial / Parallel / USB options\n"
+"14. Network card options\n"
+"15. Sound card options\n"
+"16. Other options\n"
+#if BX_PLUGINS
+"17. User-defined options\n"
+#endif
+"\n"
+"Please choose one: [0] ";
+
+static const char *runtime_menu_prompt =
+"---------------------\n"
+"Bochs Runtime Options\n"
+"---------------------\n"
+"1. Floppy disk 0: %s\n"
+"2. Floppy disk 1: %s\n"
+"3. CDROM runtime options\n"
+"4. Log options for all devices\n"
+"5. Log options for individual devices\n"
+"6. USB runtime options\n"
+"7. Misc runtime options\n"
+"8. Save configuration\n"
+"9. Continue simulation\n"
+"10. Quit now\n"
+"\n"
+"Please choose one:  [9] ";
+
+static const char *plugin_ctrl_prompt =
+"\n-----------------------\n"
+"Optional plugin control\n"
+"-----------------------\n"
+"0. Return to previous menu\n"
+"1. Load optional plugin\n"
+"2. Unload optional plugin\n"
+"\n"
+"Please choose one:  [0] ";
+
+void bx_switch_config_interface_init()
+{}
+
 int bx_switch_config_interface(int menu)
 {
-  BX_INFO(("ok, hi"));
+  switch(menu)
+  {
+    case BX_CI_INIT:
+      bx_switch_config_interface_init();
+    return 0;
+
+    case BX_CI_START_SIMULATION:
+      SIM->begin_simulation(bx_startup_flags.argc, bx_startup_flags.argv);
+    break;
+
+    case BX_CI_START_MENU:
+      Bit32u n_choices = 7;
+      Bit32u default_choice;
+      switch (SIM->get_param_enum(BXPN_BOCHS_START)->get()) {
+        case BX_LOAD_START:
+          default_choice = 2; break;
+        case BX_EDIT_START:
+          default_choice = 3; break;
+        default:
+          default_choice = 6; break;
+      }
+      printf(startup_menu_prompt, default_choice);
+
+      int choice = default_choice;
+      switch(choice)
+      {
+          case 6:
+            printf("??\n");
+            bx_switch_config_interface(BX_CI_START_SIMULATION);
+          break;
+      }
+    break;
+  }
   return 0;
 }
 

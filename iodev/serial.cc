@@ -35,6 +35,7 @@
 #if !defined(WIN32) || defined(__CYGWIN__)
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #define closesocket(s)    close(s)

@@ -34,7 +34,9 @@
 class bx_switch_gui_c : public bx_gui_c {
 public:
   bx_switch_gui_c (void) {}
+
   DECLARE_GUI_VIRTUAL_METHODS()
+  DECLARE_GUI_NEW_VIRTUAL_METHODS()
 };
 
 // declare one instance of the gui object and call macro to insert the
@@ -68,7 +70,7 @@ IMPLEMENT_GUI_PLUGIN_CODE(switch)
 
 void bx_switch_gui_c::specific_init(int argc, char **argv, unsigned headerbar_y)
 {
-  put("switch");
+  BX_INFO(("switch gui module! hello!"));
   UNUSED(argc);
   UNUSED(argv);
   UNUSED(headerbar_y);
@@ -143,6 +145,39 @@ void bx_switch_gui_c::text_update(Bit8u *old_text, Bit8u *new_text,
   UNUSED(tm_info);
 }
 
+bx_svga_tileinfo_t * bx_switch_gui_c::graphics_tile_info(bx_svga_tileinfo_t *info)
+{
+  // ok
+  info->bpp = 32;
+  info->pitch = 720 * 4;
+  info->red_shift = 24;
+  info->green_shift = 16;
+  info->blue_shift = 8;
+  info->red_mask =   0xff000000;
+  info->green_mask = 0x00ff0000;
+  info->blue_mask =  0x0000ff00;
+
+  info->is_indexed = false;
+  info->is_little_endian = 1;
+
+  return info;
+}
+
+Bit8u * bx_switch_gui_c::graphics_tile_get(unsigned x, unsigned y, unsigned *w, unsigned *h)
+{
+ // Nothing to see here
+  return NULL;
+}
+
+void bx_switch_gui_c::graphics_tile_update_in_place(unsigned x, unsigned y, unsigned w, unsigned h)
+{
+  UNUSED(x);
+  UNUSED(y);
+  UNUSED(w);
+  UNUSED(h);
+
+  // Just do nothing. It's fine. Really.
+}
 
 // ::GET_CLIPBOARD_TEXT()
 //

@@ -827,6 +827,9 @@ static builtin_plugin_t builtin_plugins[] = {
 #if BX_WITH_X11
   BUILTIN_GUI_PLUGIN_ENTRY(x),
 #endif
+#if BX_WITH_SWITCH
+  BUILTIN_GUI_PLUGIN_ENTRY(switch),
+#endif
   BUILTIN_OPT_PLUGIN_ENTRY(unmapped),
   BUILTIN_OPT_PLUGIN_ENTRY(biosdev),
   BUILTIN_OPT_PLUGIN_ENTRY(speaker),
