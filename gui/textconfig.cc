@@ -59,22 +59,7 @@ extern "C" {
 #define bx_printf SIM->bx_printf
 #define bx_fgets  SIM->bx_gets
 #else
-#define bx_printf bx_printf
-
-#include <stdarg.h>
-#include <switch.h>
-
-char bx_printf_buffer[2048];
-int bx_printf(const char *format, ...)
-{
-  va_list arg;
-  va_start(arg, format);
-  int i = vsnprintf(bx_printf_buffer, 2048, format, arg);
-  svcOutputDebugString(bx_printf_buffer, strlen(bx_printf_buffer));
-  va_end(arg);
-  return i;
-}
-
+#define bx_printf printf
 #define bx_fgets  fgets
 #endif
 
