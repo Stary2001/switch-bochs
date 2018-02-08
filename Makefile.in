@@ -23,7 +23,7 @@
 # Switch specific.
 
 TOPDIR ?= $(CURDIR)
-include $(DEVKITPRO)/libnx/switch_rules
+include build/switch_rules
 
 TARGET		:=	bochs
 EXEFS_SRC	:=	exefs_src
@@ -75,13 +75,15 @@ all	:	$(OUTPUT).pfs0 $(OUTPUT).nro
 
 $(OUTPUT).pfs0	:	$(OUTPUT).nso
 
-$(OUTPUT).nso	:	bochs@EXE@
+$(OUTPUT).nso	:	$(OUTPUT).elf
 
 ifeq ($(strip $(NO_NACP)),)
-$(OUTPUT).nro	:	bochs@EXE@ $(OUTPUT).nacp
+$(OUTPUT).nro	:	$(OUTPUT).elf $(OUTPUT).nacp
 else
-$(OUTPUT).nro	:	bochs@EXE@
+$(OUTPUT).nro	:	$(OUTPUT).elf
 endif
+
+$(OUTPUT).elf: bochs@EXE@
 
 # end switch specific
 
