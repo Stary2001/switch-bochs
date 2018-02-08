@@ -81,6 +81,19 @@ case "$target" in
     LIBS="$LIBS -lsocket -lnsl"
     DEFAULT_GUI=x11
     ;;
+  aarch64*)
+    CC="$DEVKITPRO/devkitA64/bin/aarch64-none-elf-gcc"
+    CXX="$DEVKITPRO/devkitA64/bin/aarch64-none-elf-g++"
+
+    HEADER_PATHS="-I$DEVKITPRO/libnx/include"
+    ARCH="-g -Wall -O2 -march=armv8-a -mtp=soft -fPIE "
+    CXXFLAGS="$CXXFLAGS -fno-rtti -fno-exceptions"
+    LIBPATHS="-L$DEVKITPRO/libnx/lib -L$DEKVITPRO/portlibs/switch/lib -L$DEKVITPRO/portlibs/armv8-a/lib"
+    EXTRA_LINK_OPTS="$LIBPATHS -specs=$DEVKITPRO/libnx/switch.specs -g $ARCH"
+
+    ADD_FLAGS="$ARCH -DSWITCH $HEADER_PATHS $LIBPATHS"
+    LIBS="$LIBS -lnx"
+   ;;
   *)
     DEFAULT_GUI=x11
     ;;
@@ -2625,7 +2638,6 @@ if test "$with_switch" = yes; then
   AC_DEFINE(BX_WITH_SWITCH, 1)
   AC_DEFINE(BX_DEFAULT_DISPLAY_LIBRARY, "switch")
   SPECIFIC_GUI_OBJS="$SPECIFIC_GUI_OBJS \$(GUI_OBJS_SWITCH)"
-  EXTRA_LINK_OPTS="-lnx"
 fi
 
 AC_MSG_CHECKING(for display libraries)
@@ -2806,6 +2818,10 @@ case "$target" in
       BXHUB_LINK_OPTS="-lws2_32"
     fi
     AC_DEFINE(BX_HAVE_SELECT, 1)
+    ;;
+  aarch64*)
+    EXE=".elf"
+    PRIMARY_TARGET="bochs.elf"
     ;;
   *)
     if test "$networking" = yes; then

@@ -154,7 +154,27 @@ int bx_switch_config_interface(int menu)
 
 BxEvent* switch_notify_callback(void *unused, BxEvent *event)
 {
-  return event;
+  switch(event->type)
+  {
+    case BX_SYNC_EVT_TICK:
+      if(appletMainLoop())
+      {
+        event->retcode = 0;
+      }
+      else
+      {
+        event->retcode = -1;
+      }
+      return event;
+    case BX_ASYNC_EVT_REFRESH:
+    case BX_ASYNC_EVT_DBG_MSG:
+    case BX_ASYNC_EVT_LOG_MSG:
+      // Ignore these.
+      return event;
+    default:
+      fprintf(stderr, "textconfig: notify callback called with event type %04x\n", event->type);
+      return event;
+  }
 }
 
 static int ci_callback(void *userdata, ci_command_t command)

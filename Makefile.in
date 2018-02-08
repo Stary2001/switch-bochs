@@ -19,6 +19,72 @@
 # the following rules:
 #   use $(VAR) not ${VAR}
 
+
+# Switch specific.
+
+TOPDIR ?= $(CURDIR)
+include $(DEVKITPRO)/libnx/switch_rules
+
+TARGET		:=	bochs
+EXEFS_SRC	:=	exefs_src
+
+ASFLAGS	:=	-g $(ARCH)
+
+
+ifeq ($(strip $(CPPFILES)),)
+#---------------------------------------------------------------------------------
+	export LD	:=	$(CC)
+#---------------------------------------------------------------------------------
+else
+#---------------------------------------------------------------------------------
+	export LD	:=	$(CXX)
+#---------------------------------------------------------------------------------
+endif
+
+export OUTPUT	:=	$(CURDIR)/$(TARGET)
+export TOPDIR	:=	$(CURDIR)
+
+export BUILD_EXEFS_SRC := $(TOPDIR)/$(EXEFS_SRC)
+
+ifeq ($(strip $(ICON)),)
+	icons := $(wildcard *.jpg)
+	ifneq (,$(findstring $(TARGET).jpg,$(icons)))
+		export APP_ICON := $(TOPDIR)/$(TARGET).jpg
+	else
+		ifneq (,$(findstring icon.jpg,$(icons)))
+			export APP_ICON := $(TOPDIR)/icon.jpg
+		endif
+	endif
+else
+	export APP_ICON := $(TOPDIR)/$(ICON)
+endif
+
+ifeq ($(strip $(NO_ICON)),)
+	export NROFLAGS += --icon=$(APP_ICON)
+endif
+
+ifeq ($(strip $(NO_NACP)),)
+	export NROFLAGS += --nacp=$(CURDIR)/$(TARGET).nacp
+endif
+
+ifneq ($(APP_TITLEID),)
+	export NACPFLAGS += --titleid=$(APP_TITLEID)
+endif
+
+all	:	$(OUTPUT).pfs0 $(OUTPUT).nro
+
+$(OUTPUT).pfs0	:	$(OUTPUT).nso
+
+$(OUTPUT).nso	:	bochs@EXE@
+
+ifeq ($(strip $(NO_NACP)),)
+$(OUTPUT).nro	:	bochs@EXE@ $(OUTPUT).nacp
+else
+$(OUTPUT).nro	:	bochs@EXE@
+endif
+
+# end switch specific
+
 prefix          = @prefix@
 exec_prefix     = @exec_prefix@
 srcdir          = @srcdir@
@@ -531,6 +597,12 @@ clean:
 	@RMCOMMAND@ *.o
 	@RMCOMMAND@ *.a
 	@RMCOMMAND@ bochs
+	@RMCOMMAND@ bochs.elf
+	@RMCOMMAND@ bochs.nso
+	@RMCOMMAND@ bochs.nro
+	@RMCOMMAND@ bochs.nacp
+	@RMCOMMAND@ bochs.pfs0
+	@RMCOMMAND@ -r exefs
 	@RMCOMMAND@ bochs.exe
 	@RMCOMMAND@ bximage
 	@RMCOMMAND@ bximage.exe
