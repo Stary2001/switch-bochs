@@ -75,6 +75,10 @@ void iofunctions::flush(void)
 {
   if(logfd && magic == MAGIC_LOGNUM) {
     fflush(logfd);
+
+#ifdef BX_WITH_SWITCH
+    gfxFlushBuffers();
+#endif
   }
 }
 
@@ -258,6 +262,11 @@ void iofunctions::out(int level, const char *prefix, const char *fmt, va_list ap
   vsnprintf(msg, sizeof(msg), fmt, ap);
   fprintf(logfd, "%s\n", msg);
   fflush(logfd);
+
+#ifdef BX_WITH_SWITCH
+  gfxFlushBuffers();
+#endif
+
   if (SIM->has_log_viewer()) {
     SIM->log_msg(msgpfx, level, msg);
   }

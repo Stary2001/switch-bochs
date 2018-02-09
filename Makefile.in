@@ -22,6 +22,10 @@
 
 # Switch specific.
 
+APP_TITLE = Bochs
+APP_AUTHOR = Stary
+APP_VERSION = 1.0.0
+
 TOPDIR ?= $(CURDIR)
 include build/switch_rules
 

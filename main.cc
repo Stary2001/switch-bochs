@@ -311,7 +311,6 @@ int bxmain(void)
 #ifdef BX_WITH_SWITCH
   gfxInitDefault();
   consoleInit(NULL);
-  svcOutputDebugString("gfxInit!", strlen("gfxInit!"));
   printf("Hi!\n");
 #endif
 #ifdef HAVE_LOCALE_H
@@ -380,10 +379,9 @@ int bxmain(void)
   }
 #endif
 #ifdef BX_WITH_SWITCH
+  printf("Sim done!\n");
   svcSleepThread(10e9);
-  svcOutputDebugString("gfxExit a!", strlen("gfxExit a!"));
   gfxExit();
-  svcOutputDebugString("gfxExit b!", strlen("gfxExit b!"));
 #endif
   BX_INSTR_EXIT_ENV();
   return SIM->get_exit_code();
@@ -907,6 +905,7 @@ int bx_init_main(int argc, char *argv[])
   SIM->opt_plugin_ctrl("*", 1);
   SIM->init_save_restore();
   SIM->init_statistics();
+
   if (load_rcfile) {
     // parse configuration file and command line arguments
 #ifdef WIN32

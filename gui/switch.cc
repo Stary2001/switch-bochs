@@ -111,6 +111,9 @@ void bx_switch_gui_c::handle_events(void)
 
 void bx_switch_gui_c::flush(void)
 {
+  gfxFlushBuffers();
+  gfxSwapBuffers();
+  gfxWaitForVsync();
 }
 
 
@@ -124,6 +127,7 @@ void bx_switch_gui_c::clear_screen(void)
   u32 width, height;
   u8 *fb = gfxGetFramebuffer(NULL, NULL);
   memset(fb, 0, gfxGetFramebufferSize());
+  gfxFlushBuffers();
 }
 
 
@@ -366,6 +370,10 @@ void bx_switch_gui_c::dimension_update(unsigned x, unsigned y, unsigned fheight,
   }
 
   BX_INFO(("mode switch to %i by %i at %i bpp, text mode: %i", x, y, bpp, (int)guest_textmode));
+
+  int chars_left = (720 - y) / 8;
+  consoleSetWindow(NULL, 0, chars_left, 80, 90-chars_left);
+  clear_screen();
 }
 
 
