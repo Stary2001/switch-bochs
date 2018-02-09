@@ -86,10 +86,10 @@ case "$target" in
     CXX="$DEVKITPRO/devkitA64/bin/aarch64-none-elf-g++"
 
     HEADER_PATHS="-I$DEVKITPRO/libnx/include"
-    ARCH="-g -Wall -O2 -march=armv8-a -mtp=soft -fPIE "
+    ARCH="-g -Wall -fomit-frame-pointer -ffunction-sections -march=armv8-a -mtp=soft -fPIE"
     CXXFLAGS="$CXXFLAGS -fno-rtti -fno-exceptions"
     LIBPATHS="-L$DEVKITPRO/libnx/lib -L$DEKVITPRO/portlibs/switch/lib -L$DEKVITPRO/portlibs/armv8-a/lib"
-    EXTRA_LINK_OPTS="$LIBPATHS -specs=$DEVKITPRO/libnx/switch.specs -g $ARCH"
+    EXTRA_LINK_OPTS="$LIBPATHS -specs=$DEVKITPRO/libnx/switch.specs $ARCH"
 
     ADD_FLAGS="$ARCH -DSWITCH $HEADER_PATHS $LIBPATHS"
     LIBS="$LIBS -lnx"

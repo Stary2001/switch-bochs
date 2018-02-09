@@ -30,13 +30,20 @@
 
 #if BX_WITH_SWITCH
 #include "icon_bochs.h"
-
+#include "font/vga.bitmap.h"
 class bx_switch_gui_c : public bx_gui_c {
 public:
   bx_switch_gui_c (void) {}
 
   DECLARE_GUI_VIRTUAL_METHODS()
   DECLARE_GUI_NEW_VIRTUAL_METHODS()
+
+  void vga_draw_char(int x, int y, char c);
+
+  unsigned int guest_xchars;
+  unsigned int guest_ychars;
+  u32 vga_fg;
+  u32 vga_bg;
 };
 
 // declare one instance of the gui object and call macro to insert the
@@ -71,6 +78,7 @@ IMPLEMENT_GUI_PLUGIN_CODE(switch)
 void bx_switch_gui_c::specific_init(int argc, char **argv, unsigned headerbar_y)
 {
   BX_INFO(("switch gui module! hello!"));
+
   UNUSED(argc);
   UNUSED(argv);
   UNUSED(headerbar_y);
@@ -80,6 +88,8 @@ void bx_switch_gui_c::specific_init(int argc, char **argv, unsigned headerbar_y)
   if (SIM->get_param_bool(BXPN_PRIVATE_COLORMAP)->get()) {
     BX_INFO(("private_colormap option ignored."));
   }
+
+  clear_screen();
 }
 
 
@@ -111,8 +121,10 @@ void bx_switch_gui_c::flush(void)
 
 void bx_switch_gui_c::clear_screen(void)
 {
+  u32 width, height;
+  u8 *fb = gfxGetFramebuffer(NULL, NULL);
+  memset(fb, 0, gfxGetFramebufferSize());
 }
-
 
 
 // ::TEXT_UPDATE()
@@ -138,11 +150,87 @@ void bx_switch_gui_c::text_update(Bit8u *old_text, Bit8u *new_text,
                       unsigned long cursor_x, unsigned long cursor_y,
                       bx_vga_tminfo_t *tm_info)
 {
-  UNUSED(old_text);
-  UNUSED(new_text);
-  UNUSED(cursor_x);
-  UNUSED(cursor_y);
-  UNUSED(tm_info);
+  // 0xRRGGBBAA is used for texture writes
+
+  const u32 vga_colours[] =
+  {
+    0xff000000, // black #000000
+    0xffaa0000, // blue #0000aa
+    0xff00aa00, // green #00aa00
+    0xffaaaa00, // cyan #00aaaa
+    0xff0000aa, // red #aa0000
+    0xffaa00aa, // magenta #aa00aa
+    0xff0055aa, // brown #aa5500
+    0xffaaaaaa, // grey #aaaaaa
+    0xff555555, // dark grey #555555
+    0xffff5500, // bright blue #5555ff
+    0xff55ff55, // bright green #55ff55
+    0xffffff55, // bright cyan #55ffff
+    0xff5555ff, // bright red #ff5555
+    0xffff55ff, // bright magenta #ff55ff
+    0xff55ffff, // yellow #ffff55
+    0xffffffff // white #ffffff
+  };
+
+  unsigned char *old_line, *new_line, *new_start;
+  unsigned char cAttr;
+  unsigned int hchars, rows, x, y;
+  char ch;
+  bx_bool force_update = 0;
+
+  if(charmap_updated) {
+    force_update = 1;
+    charmap_updated = 0;
+  }
+
+  new_start = new_text;
+  rows = guest_ychars;
+  y = 0;
+  do {
+    hchars = guest_xchars;
+    new_line = new_text;
+    old_line = old_text;
+    x = 0;
+    do {
+      if (force_update || (old_text[0] != new_text[0])
+          || (old_text[1] != new_text[1])) {
+        
+        vga_fg = vga_colours[new_text[1] & 0xf];
+        vga_bg = vga_colours[(new_text[1] & 0xf0) >> 4];
+
+        ch = new_text[0];
+        //if ((new_text[1] & 0x08) > 0) ch |= A_BOLD;
+        //if ((new_text[1] & 0x80) > 0) ch |= A_BLINK;
+        vga_draw_char(x, y, ch);
+      }
+      x++;
+      new_text+=2;
+      old_text+=2;
+    } while (--hchars);
+    y++;
+    new_text = new_line + tm_info->line_offset;
+    old_text = old_line + tm_info->line_offset;
+  } while (--rows);
+
+  if ((cursor_x<guest_xchars) && (cursor_y<guest_ychars)
+      && (tm_info->cs_start <= tm_info->cs_end)) {
+    if(cursor_x>0)
+      cursor_x--;
+    else {
+      cursor_x=25-1;
+      cursor_y--;
+    }
+
+    cAttr = new_start[cursor_y*tm_info->line_offset+cursor_x*2+1];
+    vga_fg = vga_colours[cAttr & 0xf];
+    vga_bg = vga_colours[(cAttr & 0xf0) >> 8];
+
+    ch = new_start[cursor_y*tm_info->line_offset+cursor_x*2];
+    vga_draw_char(x, y, ch);
+    //curs_set(2);
+  } else {
+    //curs_set(0);
+  }
 }
 
 bx_svga_tileinfo_t * bx_switch_gui_c::graphics_tile_info(bx_svga_tileinfo_t *info)
@@ -262,7 +350,22 @@ void bx_switch_gui_c::dimension_update(unsigned x, unsigned y, unsigned fheight,
   guest_xres = x;
   guest_yres = y;
   guest_bpp = bpp;
-  UNUSED(fwidth);
+
+  if(guest_textmode)
+  {
+    guest_xchars = x / fwidth;
+    guest_ychars = y / fheight;
+    /*screen_xscale = 1.0;
+    screen_yscale = 1.0;
+    pan_x = 0;
+    pan_y = 0;*/
+  }
+  else
+  {
+    // TODO
+  }
+
+  BX_INFO(("mode switch to %i by %i at %i bpp, text mode: %i", x, y, bpp, (int)guest_textmode));
 }
 
 
@@ -359,6 +462,38 @@ void bx_switch_gui_c::exit(void)
 
 void bx_switch_gui_c::mouse_enabled_changed_specific(bx_bool val)
 {
+}
+
+void bx_switch_gui_c::vga_draw_char(int x, int y, char c)
+{
+  uint32_t bytes_per_char = 16;
+  const bx_fontcharbitmap_t letter = bx_vgafont[c];
+  uint32_t xp,yp = 0;
+
+  u8 *fb = gfxGetFramebuffer(NULL, NULL);
+  u32 *fb32 = (u32*)fb;
+
+  for(xp=0; xp < 8; xp+=4)
+  {
+    for(yp=0 ; yp < 16; yp++)
+    {
+      uint32_t xx = (x * 8) + xp;
+      uint32_t yy = (y * 16) + yp;
+
+      int ind = gfxGetFramebufferDisplayOffset(xx, yy);
+      for(int j = 0; j < 4; j++)
+      {
+        if(letter.data[yp] & (1 << (xp + j)))
+        {
+          fb32[ind + j] = vga_fg;
+        }
+        else
+        {
+          fb32[ind + j] = vga_bg;
+        }
+      }
+    }
+  }
 }
 
 #endif /* if BX_WITH_switch */
