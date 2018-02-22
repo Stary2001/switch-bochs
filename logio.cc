@@ -263,10 +263,6 @@ void iofunctions::out(int level, const char *prefix, const char *fmt, va_list ap
   fprintf(logfd, "%s\n", msg);
   fflush(logfd);
 
-#ifdef BX_WITH_SWITCH
-  gfxFlushBuffers();
-#endif
-
   if (SIM->has_log_viewer()) {
     SIM->log_msg(msgpfx, level, msg);
   }

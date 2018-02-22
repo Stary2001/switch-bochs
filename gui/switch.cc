@@ -27,10 +27,12 @@
 #include "bochs.h"
 #include "plugin.h"
 #include "param_names.h"
+#include "iodev.h"
 
 #if BX_WITH_SWITCH
 #include "icon_bochs.h"
 #include "font/vga.bitmap.h"
+
 class bx_switch_gui_c : public bx_gui_c {
 public:
   bx_switch_gui_c (void) {}
@@ -38,18 +40,42 @@ public:
   DECLARE_GUI_VIRTUAL_METHODS()
   DECLARE_GUI_NEW_VIRTUAL_METHODS()
 
+  #if BX_SHOW_IPS
+    virtual void show_ips(Bit32u ips_count);
+  #endif
+
   void vga_draw_char(int x, int y, char c);
 
   unsigned int guest_xchars;
   unsigned int guest_ychars;
   u32 vga_fg;
   u32 vga_bg;
+
+  int mouse_button_state;
+  int mouse_last_x;
+  int mouse_last_y;
+
+  u32 palette[256];
+  char ips_text[16];
 };
 
-// declare one instance of the gui object and call macro to insert the
-// plugin code
+int init_switch_config_interface();
+// declare one instance of the gui object.
 static bx_switch_gui_c *theGui = NULL;
-IMPLEMENT_GUI_PLUGIN_CODE(switch)
+extern "C" int libswitch_gui_plugin_init(plugin_t *plugin, plugintype_t type)
+{
+  init_switch_config_interface();
+  theGui = new bx_switch_gui_c();
+  bx_gui = theGui;
+  SIM->get_param_enum(BXPN_SEL_DISPLAY_LIBRARY)->set_enabled(0);
+  SIM->set_log_viewer(true);
+  return 0;
+}
+
+extern "C" void libswitch_gui_plugin_fini()
+{
+  // Nothing here yet
+}
 
 #define LOG_THIS theGui->
 
@@ -90,6 +116,7 @@ void bx_switch_gui_c::specific_init(int argc, char **argv, unsigned headerbar_y)
   }
 
   clear_screen();
+  memset(ips_text, 0, sizeof(ips_text));
 }
 
 
@@ -101,6 +128,50 @@ void bx_switch_gui_c::specific_init(int argc, char **argv, unsigned headerbar_y)
 
 void bx_switch_gui_c::handle_events(void)
 {
+  hidScanInput();
+  u64 kDown = hidKeysDown(CONTROLLER_P1_AUTO);
+  u64 kUp = hidKeysUp(CONTROLLER_P1_AUTO);
+
+  u32 keycodes[] = {BX_KEY_LEFT, BX_KEY_RIGHT, BX_KEY_UP, BX_KEY_DOWN, BX_KEY_ENTER};
+  u64 keys[] = {KEY_DLEFT, KEY_DRIGHT, KEY_DUP, KEY_DDOWN, KEY_X};
+
+  for(int i = 0; i < 5; i++)
+  {
+    if(kDown & keys[i])
+    {
+      fprintf(stderr, "keycode %d\n", i);
+      DEV_kbd_gen_scancode(keycodes[i]);
+    }
+    if(kUp & keys[i])
+    {
+      fprintf(stderr, "keycode %d up\n", i);
+      DEV_kbd_gen_scancode(keycodes[i] | BX_KEY_RELEASED);
+    }
+  }
+
+  if(kDown & KEY_A)
+  {
+    mouse_button_state |= 1;
+  }
+  if(kDown & KEY_B)
+  {
+    mouse_button_state |= (1<<1);
+  }
+
+  if(kUp & KEY_A)
+  {
+    mouse_button_state &= 1;
+  }
+  if(kDown & KEY_B)
+  {
+    mouse_button_state &= (1<<1);
+  }
+
+  JoystickPosition p;
+  hidJoystickRead(&p, CONTROLLER_P1_AUTO, JOYSTICK_RIGHT);
+  if(p.dx != 0 || p.dy != 0)
+    fprintf(stderr, "%0.2f %0.2f\n", p.dx / (float)JOYSTICK_MAX , p.dy/(float)JOYSTICK_MAX );
+  DEV_mouse_motion((p.dx / (float)JOYSTICK_MAX) * 10.0f , (p.dy/(float)JOYSTICK_MAX)*10.0f, 0, mouse_button_state, 0);
 }
 
 
@@ -109,8 +180,19 @@ void bx_switch_gui_c::handle_events(void)
 // Called periodically, requesting that the gui code flush all pending
 // screen update requests.
 
+extern uint8_t* g_framebuf;
+extern u32 g_framebuf_width;
+extern u32 g_framebuf_stride;
+extern u32 g_framebuf_height;
+extern bool flush_called;
+
 void bx_switch_gui_c::flush(void)
 {
+  flush_called = true;
+  // assume both fbs have equal width
+  // hack, replace with real compositing..
+  /*u8 *real_fb = gfxGetFramebuffer(NULL, NULL);
+  memcpy(real_fb, g_framebuf, g_framebuf_height * g_framebuf_stride);*/
   gfxFlushBuffers();
   gfxSwapBuffers();
   gfxWaitForVsync();
@@ -230,7 +312,7 @@ void bx_switch_gui_c::text_update(Bit8u *old_text, Bit8u *new_text,
     vga_bg = vga_colours[(cAttr & 0xf0) >> 8];
 
     ch = new_start[cursor_y*tm_info->line_offset+cursor_x*2];
-    vga_draw_char(x, y, ch);
+    vga_draw_char(cursor_x, cursor_y, ch);
     //curs_set(2);
   } else {
     //curs_set(0);
@@ -242,12 +324,12 @@ bx_svga_tileinfo_t * bx_switch_gui_c::graphics_tile_info(bx_svga_tileinfo_t *inf
   // ok
   info->bpp = 32;
   info->pitch = 720 * 4;
-  info->red_shift = 24;
-  info->green_shift = 16;
-  info->blue_shift = 8;
-  info->red_mask =   0xff000000;
-  info->green_mask = 0x00ff0000;
-  info->blue_mask =  0x0000ff00;
+  info->red_shift = 0;
+  info->green_shift = 8;
+  info->blue_shift = 16;
+  info->red_mask =   0x000000ff;
+  info->green_mask = 0x0000ff00;
+  info->blue_mask =  0x00ff0000;
 
   info->is_indexed = false;
   info->is_little_endian = 1;
@@ -257,8 +339,8 @@ bx_svga_tileinfo_t * bx_switch_gui_c::graphics_tile_info(bx_svga_tileinfo_t *inf
 
 Bit8u * bx_switch_gui_c::graphics_tile_get(unsigned x, unsigned y, unsigned *w, unsigned *h)
 {
- // Nothing to see here
-  return NULL;
+    Bit8u *fb = gfxGetFramebuffer(NULL, NULL);
+    return NULL;
 }
 
 void bx_switch_gui_c::graphics_tile_update_in_place(unsigned x, unsigned y, unsigned w, unsigned h)
@@ -305,11 +387,8 @@ int bx_switch_gui_c::set_clipboard_text(char *text_snapshot, Bit32u len)
 
 bx_bool bx_switch_gui_c::palette_change(Bit8u index, Bit8u red, Bit8u green, Bit8u blue)
 {
-  UNUSED(index);
-  UNUSED(red);
-  UNUSED(green);
-  UNUSED(blue);
-  return(0);
+  palette[index] = red | (green << 8) | (blue << 16) | (0xff << 24);
+  return 0;
 }
 
 
@@ -330,9 +409,23 @@ bx_bool bx_switch_gui_c::palette_change(Bit8u index, Bit8u red, Bit8u green, Bit
 
 void bx_switch_gui_c::graphics_tile_update(Bit8u *tile, unsigned x0, unsigned y0)
 {
-  UNUSED(tile);
-  UNUSED(x0);
-  UNUSED(y0);
+  u32 x = 0;
+  u32 y = 0;
+  int i = 0;
+  u32 width = 0;
+  u32 *fb32 = (u32*)gfxGetFramebuffer(&width, NULL);
+
+  for(; y < y_tilesize; y++)
+  {
+    if(y0 + y >= guest_yres) break; // why is y_tilesize 24????
+    
+    for(x = 0; x < x_tilesize; x++)
+    {
+      int ind = (y0 + y) * width + x + x0;
+      fb32[ind] = palette[tile[i]];
+      i++;
+    }
+  }
 }
 
 
@@ -359,20 +452,14 @@ void bx_switch_gui_c::dimension_update(unsigned x, unsigned y, unsigned fheight,
   {
     guest_xchars = x / fwidth;
     guest_ychars = y / fheight;
-    /*screen_xscale = 1.0;
-    screen_yscale = 1.0;
-    pan_x = 0;
-    pan_y = 0;*/
   }
   else
   {
-    // TODO
+    // todo: scaling and stuff.
   }
 
   BX_INFO(("mode switch to %i by %i at %i bpp, text mode: %i", x, y, bpp, (int)guest_textmode));
 
-  int chars_left = (720 - y) / 8;
-  consoleSetWindow(NULL, 0, chars_left, 80, 90-chars_left);
   clear_screen();
 }
 
@@ -478,30 +565,34 @@ void bx_switch_gui_c::vga_draw_char(int x, int y, char c)
   const bx_fontcharbitmap_t letter = bx_vgafont[c];
   uint32_t xp,yp = 0;
 
-  u8 *fb = gfxGetFramebuffer(NULL, NULL);
+  u32 width = 0;
+  u8 *fb = gfxGetFramebuffer(&width, NULL);
   u32 *fb32 = (u32*)fb;
 
-  for(xp=0; xp < 8; xp+=4)
+  for(yp=0 ; yp < 16; yp++)
   {
-    for(yp=0 ; yp < 16; yp++)
+    int ind = (y * 16 + yp) * width;
+    for(xp=0; xp < 8; xp++)
     {
       uint32_t xx = (x * 8) + xp;
-      uint32_t yy = (y * 16) + yp;
-
-      int ind = gfxGetFramebufferDisplayOffset(xx, yy);
-      for(int j = 0; j < 4; j++)
+      if(letter.data[yp] & (1 << xp))
       {
-        if(letter.data[yp] & (1 << (xp + j)))
-        {
-          fb32[ind + j] = vga_fg;
-        }
-        else
-        {
-          fb32[ind + j] = vga_bg;
-        }
+        fb32[ind + xx] = vga_fg;
+      }
+      else
+      {
+        fb32[ind + xx] = vga_bg;
       }
     }
   }
 }
+
+#if BX_SHOW_IPS
+void bx_switch_gui_c::show_ips(Bit32u ips_count)
+{
+  ips_count /= 1000;
+  sprintf(ips_text, "%u.%3.3u", ips_count / 1000, ips_count % 1000);
+}
+#endif
 
 #endif /* if BX_WITH_switch */

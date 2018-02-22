@@ -310,8 +310,8 @@ int bxmain(void)
 {
 #ifdef BX_WITH_SWITCH
   gfxInitDefault();
-  consoleInit(NULL);
-  printf("Hi!\n");
+  gfxSetMode(GfxMode_LinearDouble);
+  //consoleDebugInit(debugDevice_SVC);
 #endif
 #ifdef HAVE_LOCALE_H
   // Initialize locale (for isprint() and other functions)
@@ -351,8 +351,8 @@ int bxmain(void)
     }
 #endif
 #if BX_WITH_SWITCH
-    else if(!strcmp(ci_name, "switchconfig")) {
-      init_switch_config_interface();
+    else if(!strcmp(ci_name, "switch")) {
+      PLUG_load_gui_plugin("switch");
     }
 #endif
     else {
@@ -961,6 +961,7 @@ bx_bool load_and_init_display_lib(void)
     // the simulation for the second time.
     // Also, if you load wxWidgets as the configuration interface.  Its
     // plugin_init will install wxWidgets as the bx_gui.
+    // The switch interface already does this, as well.
     return 1;
   }
   BX_ASSERT(bx_gui == NULL);
@@ -968,9 +969,17 @@ bx_bool load_and_init_display_lib(void)
   const char *ci_name = ci_param->get_selected();
   bx_param_enum_c *gui_param = SIM->get_param_enum(BXPN_SEL_DISPLAY_LIBRARY);
   const char *gui_name = gui_param->get_selected();
-  if (!strcmp(ci_name, "wx")) {
-    BX_ERROR(("change of the config interface to wx not implemented yet"));
+
+  if (!strcmp(ci_name, "wx") || !strcmp(ci_name, "switch")) {
+    BX_ERROR(("change of the config interface to wx/switch not implemented yet"));
   }
+
+  if(!strcmp(gui_name, "switch"))
+  {
+    BX_ERROR(("You must use the switch gui!"));
+    BX_PANIC(("Switch does not have any other display libraries!!"));
+  }
+
   if (!strcmp(gui_name, "wx")) {
     // they must not have used wx as the configuration interface, or bx_gui
     // would already be initialized.  Sorry, it doesn't work that way.
@@ -1421,7 +1430,7 @@ void bx_init_hardware()
   signal(SIGINT, bx_signal_handler);
 #endif
 
-#if BX_SHOW_IPS
+#if BX_SHOW_IPS && !BX_WITH_SWITCH
 #if !defined(WIN32)
   if (!SIM->is_wx_selected()) {
     signal(SIGALRM, bx_signal_handler);
@@ -1467,7 +1476,7 @@ int bx_atexit(void)
   signal(SIGINT, SIG_DFL);
 #endif
 
-#if BX_SHOW_IPS
+#if BX_SHOW_IPS && !BX_WITH_SWITCH
 #if !defined(__MINGW32__) && !defined(_MSC_VER)
   if (!SIM->is_wx_selected()) {
     alarm(0);
@@ -1527,7 +1536,7 @@ void CDECL bx_signal_handler(int signum)
   }
 #endif
 
-#if BX_SHOW_IPS
+#if BX_SHOW_IPS && !BX_WITH_SWITCH
   if (signum == SIGALRM) {
     bx_show_ips_handler();
 #if !defined(WIN32)

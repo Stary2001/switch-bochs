@@ -20,6 +20,11 @@ extern "C" {
 #include "param_names.h"
 #include "switchconfig.h"
 
+extern "C"
+{
+#include "font/common.h"
+}
+
 #define CI_PATH_LENGTH 512
 
 #if BX_USE_GUI_CONSOLE
@@ -143,7 +148,6 @@ int bx_switch_config_interface(int menu)
       switch(choice)
       {
           case 6:
-            printf("??\n");
             bx_switch_config_interface(BX_CI_START_SIMULATION);
           break;
       }
@@ -151,6 +155,14 @@ int bx_switch_config_interface(int menu)
   }
   return 0;
 }
+
+int console_y = 0;
+uint8_t* g_framebuf;
+u32 g_framebuf_width;
+u32 g_framebuf_stride;
+u32 g_framebuf_height;
+
+bool flush_called = false;
 
 BxEvent* switch_notify_callback(void *unused, BxEvent *event)
 {
@@ -167,10 +179,34 @@ BxEvent* switch_notify_callback(void *unused, BxEvent *event)
       }
       return event;
     case BX_ASYNC_EVT_REFRESH:
+      // Ignore.
+      return event;
+
     case BX_ASYNC_EVT_DBG_MSG:
     case BX_ASYNC_EVT_LOG_MSG:
-      // Ignore these.
+    {
+      int line_height = tahoma12->height;
+      DrawText(tahoma12, 0, console_y, MakeColor(255, 255, 255, 255), event->u.logmsg.msg);
+
+      console_y += line_height;
+      if(console_y > g_framebuf_height)
+      {
+        int line_bytes = g_framebuf_stride * line_height;
+        memmove(g_framebuf, g_framebuf + line_bytes, g_framebuf_stride * (g_framebuf_height - line_height));
+        memset(g_framebuf + g_framebuf_stride * (g_framebuf_height - line_height), 0, line_bytes);
+        console_y = g_framebuf_height - line_height;
+      }
+
+      if(!flush_called) // lol hack
+      {
+        u8 *real_fb = gfxGetFramebuffer(NULL, NULL);
+        memcpy(real_fb, g_framebuf, g_framebuf_height * g_framebuf_stride);
+        gfxFlushBuffers();
+        gfxSwapBuffers();
+      }
+      delete [] event->u.logmsg.msg;
       return event;
+    }
     default:
       fprintf(stderr, "textconfig: notify callback called with event type %04x\n", event->type);
       return event;
@@ -190,7 +226,6 @@ static int ci_callback(void *userdata, ci_command_t command)
       }
       break;
     case CI_RUNTIME_CONFIG:
-      bx_switch_config_interface(BX_CI_RUNTIME);
       break;
     case CI_SHUTDOWN:
       break;
@@ -200,7 +235,12 @@ static int ci_callback(void *userdata, ci_command_t command)
 
 int init_switch_config_interface()
 {
-  SIM->register_configuration_interface("switchconfig", ci_callback, NULL);
+  g_framebuf_width = 1280;
+  g_framebuf_stride = g_framebuf_width * 4;
+  g_framebuf_height = tahoma12->height * 15;
+  g_framebuf = (uint8_t*)malloc(g_framebuf_stride * g_framebuf_height * 2);
+
+  SIM->register_configuration_interface("switch", ci_callback, NULL);
   return 0;  // success
 }
 
