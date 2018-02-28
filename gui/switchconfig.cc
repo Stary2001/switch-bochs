@@ -156,6 +156,17 @@ int bx_switch_config_interface(int menu)
   return 0;
 }
 
+#define N_LINES 16
+struct console_line
+{
+  int y;
+  int h;
+  int stage;
+};
+
+int current_line = 0;
+struct console_line console_lines[N_LINES];
+
 int console_y = 0;
 uint8_t* g_framebuf;
 u32 g_framebuf_width;
@@ -163,6 +174,28 @@ u32 g_framebuf_stride;
 u32 g_framebuf_height;
 
 bool flush_called = false;
+
+int console_tick()
+{
+  int x, y;
+
+  for(int i = 0; i < N_LINES; i++)
+  {
+    int stage = console_lines[i].stage;
+    if(stage != 0)
+    {
+      console_lines[i].stage--;
+      stage--;
+      for(y = console_lines[i].y; y < console_lines[i].y + console_lines[i].h; y++)
+      {
+        for(x = 0; x < 1280*4; x+=4)
+        {
+          g_framebuf[y * g_framebuf_stride + x + 3] = (stage * 255) / N_LINES; // Set the alpha!
+        }
+      }
+    }
+  }
+}
 
 BxEvent* switch_notify_callback(void *unused, BxEvent *event)
 {
@@ -177,6 +210,15 @@ BxEvent* switch_notify_callback(void *unused, BxEvent *event)
       {
         event->retcode = -1;
       }
+
+      static int tick_count = 0;
+      tick_count++;
+      if(tick_count == 100)
+      {
+        tick_count = 0;
+        console_tick();
+      }
+
       return event;
     case BX_ASYNC_EVT_REFRESH:
       // Ignore.
@@ -185,17 +227,28 @@ BxEvent* switch_notify_callback(void *unused, BxEvent *event)
     case BX_ASYNC_EVT_DBG_MSG:
     case BX_ASYNC_EVT_LOG_MSG:
     {
-      int line_height = tahoma12->height;
-      DrawText(tahoma12, 0, console_y, MakeColor(255, 255, 255, 255), event->u.logmsg.msg);
+      console_tick();
 
-      console_y += line_height;
-      if(console_y > g_framebuf_height)
+      int line_height = tahoma12->height + 2;
+      console_lines[current_line].stage = N_LINES;
+      console_lines[current_line].y = 0;
+      console_lines[current_line].h = line_height;
+      current_line++;
+      if(current_line == N_LINES)
       {
-        int line_bytes = g_framebuf_stride * line_height;
-        memmove(g_framebuf, g_framebuf + line_bytes, g_framebuf_stride * (g_framebuf_height - line_height));
-        memset(g_framebuf + g_framebuf_stride * (g_framebuf_height - line_height), 0, line_bytes);
-        console_y = g_framebuf_height - line_height;
+        current_line = 0;
       }
+
+      int line_bytes = g_framebuf_stride * line_height;
+      memmove(g_framebuf + line_bytes, g_framebuf, g_framebuf_stride * (g_framebuf_height - line_height));
+      memset(g_framebuf, 0, line_bytes);
+
+      for(int i = current_line; i < current_line+N_LINES-1; i++)
+      {
+        console_lines[i % N_LINES].y += line_height;
+      }
+
+      DrawText(g_framebuf, g_framebuf_width, tahoma12, 0, 0, MakeColor(255, 255, 255, 255), event->u.logmsg.msg);
 
       if(!flush_called) // lol hack
       {
@@ -204,6 +257,7 @@ BxEvent* switch_notify_callback(void *unused, BxEvent *event)
         gfxFlushBuffers();
         gfxSwapBuffers();
       }
+
       delete [] event->u.logmsg.msg;
       return event;
     }
@@ -237,7 +291,7 @@ int init_switch_config_interface()
 {
   g_framebuf_width = 1280;
   g_framebuf_stride = g_framebuf_width * 4;
-  g_framebuf_height = tahoma12->height * 15;
+  g_framebuf_height = (tahoma12->height + 2) * N_LINES;
   g_framebuf = (uint8_t*)malloc(g_framebuf_stride * g_framebuf_height * 2);
 
   SIM->register_configuration_interface("switch", ci_callback, NULL);

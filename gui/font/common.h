@@ -38,28 +38,27 @@ static inline color_t MakeColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
     return clr;
 }
 
-extern uint8_t* g_framebuf;
-extern u32 g_framebuf_width;
-static inline void DrawPixel(uint32_t x, uint32_t y, color_t clr)
+static inline void DrawPixel(uint8_t *fb, uint32_t fb_w, uint32_t x, uint32_t y, color_t clr)
 {
     if (x >= 1280 || y >= 720)
         return;
-    u32 off = (y * g_framebuf_width + x)*4;
-    g_framebuf[off] = BlendColor(g_framebuf[off], clr.r, clr.a); off++;
-    g_framebuf[off] = BlendColor(g_framebuf[off], clr.g, clr.a); off++;
-    g_framebuf[off] = BlendColor(g_framebuf[off], clr.b, clr.a); off++;
-    g_framebuf[off] = 0xff;
-}
-static inline void DrawPixelRaw(uint32_t x, uint32_t y, color_t clr)
-{
-    if (x >= 1280 || y >= 720)
-        return;
-    u32 off = (y * g_framebuf_width + x)*4;
-    g_framebuf[off] = clr.r; off++;
-    g_framebuf[off] = clr.g; off++;
-    g_framebuf[off] = clr.b; off++;
-    g_framebuf[off] = 0xff;
+    u32 off = (y * fb_w + x)*4;
+    fb[off] = BlendColor(fb[off], clr.r, clr.a); off++;
+    fb[off] = BlendColor(fb[off], clr.g, clr.a); off++;
+    fb[off] = BlendColor(fb[off], clr.b, clr.a); off++;
+    fb[off] = 0xff;
 }
 
-void DrawText(const ffnt_header_t* font, uint32_t x, uint32_t y, color_t clr, const char* text);
-void DrawTextTruncate(const ffnt_header_t* font, uint32_t x, uint32_t y, color_t clr, const char* text, uint32_t max_width, const char* end_text);
+static inline void DrawPixelRaw(uint8_t *fb, uint32_t fb_w, uint32_t x, uint32_t y, color_t clr)
+{
+    if (x >= 1280 || y >= 720)
+        return;
+    u32 off = (y * fb_w + x)*4;
+    fb[off] = clr.r; off++;
+    fb[off] = clr.g; off++;
+    fb[off] = clr.b; off++;
+    fb[off] = 0xff;
+}
+
+void DrawText(uint8_t *fb, uint32_t fb_w, const ffnt_header_t* font, uint32_t x, uint32_t y, color_t clr, const char* text);
+void DrawTextTruncate(uint8_t *fb, uint32_t fb_w, const ffnt_header_t* font, uint32_t x, uint32_t y, color_t clr, const char* text, uint32_t max_width, const char* end_text);

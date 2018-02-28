@@ -57,13 +57,37 @@ public:
 
   u32 palette[256];
   char ips_text[16];
+
+  u32 *guest_fb;
+  u32 guest_fb_height;
+  u32 guest_fb_width;
 };
+
+#if BX_SHOW_IPS
+bool ips_thread_should_run = true;
+Thread ips_thread;
+void bx_show_ips_handler(void);
+void show_ips_thread_func(void *param)
+{
+  (void)param;
+  while(ips_thread_should_run)
+  {
+    svcSleepThread(10e9);
+    bx_show_ips_handler();
+  }
+}
+#endif
 
 int init_switch_config_interface();
 // declare one instance of the gui object.
 static bx_switch_gui_c *theGui = NULL;
 extern "C" int libswitch_gui_plugin_init(plugin_t *plugin, plugintype_t type)
 {
+#if BX_SHOW_IPS
+   threadCreate(&ips_thread, show_ips_thread_func, NULL, 0x4000, 0x2c, 0); // ... it's a terrible hack what can i say
+   threadStart(&ips_thread);
+#endif
+
   init_switch_config_interface();
   theGui = new bx_switch_gui_c();
   bx_gui = theGui;
@@ -115,8 +139,11 @@ void bx_switch_gui_c::specific_init(int argc, char **argv, unsigned headerbar_y)
     BX_INFO(("private_colormap option ignored."));
   }
 
+  guest_fb = (u32*)malloc(1280 * 720 * 4);
+
   clear_screen();
   memset(ips_text, 0, sizeof(ips_text));
+  show_ips(100000);
 }
 
 
@@ -174,7 +201,10 @@ void bx_switch_gui_c::handle_events(void)
   DEV_mouse_motion((p.dx / (float)JOYSTICK_MAX) * 10.0f , (p.dy/(float)JOYSTICK_MAX)*10.0f, 0, mouse_button_state, 0);
 }
 
-
+extern "C"
+{
+#include "font/common.h"
+}
 // ::FLUSH()
 //
 // Called periodically, requesting that the gui code flush all pending
@@ -186,13 +216,47 @@ extern u32 g_framebuf_stride;
 extern u32 g_framebuf_height;
 extern bool flush_called;
 
+static inline uint32_t Blend(uint32_t dst, uint32_t src) // Blend 'dst' onto 'src'. Uses the dst alpha.
+{
+  uint8_t a = (dst & 0xff000000) >> 24;
+  // RGBA => 0xAABBGGRR
+  return 0xff000000 |
+         BlendColor((src & 0x00ff0000) >> 16, (dst & 0x00ff0000) >> 16, a) << 16 |
+         BlendColor((src & 0x0000ff00) >> 8, (dst & 0x0000ff00) >> 8, a) << 8 |
+         BlendColor(src & 0xff, dst & 0xff, a);
+}
+
 void bx_switch_gui_c::flush(void)
 {
   flush_called = true;
-  // assume both fbs have equal width
-  // hack, replace with real compositing..
-  /*u8 *real_fb = gfxGetFramebuffer(NULL, NULL);
-  memcpy(real_fb, g_framebuf, g_framebuf_height * g_framebuf_stride);*/
+
+  u32 width;
+  u32 *real_fb = (u32*)gfxGetFramebuffer(&width, NULL);
+  memcpy(real_fb, guest_fb, 1280 * 720 * 4); // hack hack
+
+  u32 *u32_g_framebuf = (u32*)g_framebuf;
+
+  int x, y;
+  for(y = 0; y < g_framebuf_height; y++)
+  {
+    for(x = 0; x < g_framebuf_width; x++)
+    {
+      real_fb[y * width + x] = Blend(u32_g_framebuf[y * g_framebuf_width + x], real_fb[y * width + x]);
+    }
+  }
+
+#if BX_SHOW_IPS
+  for(y = 0; y < tahoma12->height; y++)
+  {
+    for(x = guest_xres; x < guest_xres + 200; x++)
+    {
+      real_fb[y * 1280 + x] = 0; // hack hack
+    }
+  }
+
+  DrawText((u8*)real_fb, 1280, tahoma12, guest_xres, 0, MakeColor(255, 255, 255, 255), ips_text); // hack hackk
+#endif
+
   gfxFlushBuffers();
   gfxSwapBuffers();
   gfxWaitForVsync();
@@ -323,7 +387,7 @@ bx_svga_tileinfo_t * bx_switch_gui_c::graphics_tile_info(bx_svga_tileinfo_t *inf
 {
   // ok
   info->bpp = 32;
-  info->pitch = 720 * 4;
+  info->pitch = 1280 * 4;
   info->red_shift = 0;
   info->green_shift = 8;
   info->blue_shift = 16;
@@ -339,8 +403,18 @@ bx_svga_tileinfo_t * bx_switch_gui_c::graphics_tile_info(bx_svga_tileinfo_t *inf
 
 Bit8u * bx_switch_gui_c::graphics_tile_get(unsigned x, unsigned y, unsigned *w, unsigned *h)
 {
-    Bit8u *fb = gfxGetFramebuffer(NULL, NULL);
-    return NULL;
+    if (x + x_tilesize > guest_xres) {
+      *w = guest_xres - x;
+    } else {
+      *w = x_tilesize;
+    }
+
+    if (y + y_tilesize > guest_yres) {
+      *h = guest_xres - y;
+    } else {
+      *h = y_tilesize;
+    }
+    return (u8*)(guest_fb + x + (1280 * y)); // hack
 }
 
 void bx_switch_gui_c::graphics_tile_update_in_place(unsigned x, unsigned y, unsigned w, unsigned h)
@@ -388,7 +462,7 @@ int bx_switch_gui_c::set_clipboard_text(char *text_snapshot, Bit32u len)
 bx_bool bx_switch_gui_c::palette_change(Bit8u index, Bit8u red, Bit8u green, Bit8u blue)
 {
   palette[index] = red | (green << 8) | (blue << 16) | (0xff << 24);
-  return 0;
+  return 1;
 }
 
 
@@ -412,8 +486,6 @@ void bx_switch_gui_c::graphics_tile_update(Bit8u *tile, unsigned x0, unsigned y0
   u32 x = 0;
   u32 y = 0;
   int i = 0;
-  u32 width = 0;
-  u32 *fb32 = (u32*)gfxGetFramebuffer(&width, NULL);
 
   for(; y < y_tilesize; y++)
   {
@@ -421,8 +493,8 @@ void bx_switch_gui_c::graphics_tile_update(Bit8u *tile, unsigned x0, unsigned y0
     
     for(x = 0; x < x_tilesize; x++)
     {
-      int ind = (y0 + y) * width + x + x0;
-      fb32[ind] = palette[tile[i]];
+      int ind = (y0 + y) * 1280 + x + x0; // TODO: hack, should be guest_fb_width
+      guest_fb[ind] = palette[tile[i]];
       i++;
     }
   }
@@ -544,6 +616,9 @@ void bx_switch_gui_c::replace_bitmap(unsigned hbar_id, unsigned bmap_id)
 
 void bx_switch_gui_c::exit(void)
 {
+#if BX_SHOW_IPS
+  ips_thread_should_run = false;
+#endif
   BX_INFO(("bx_switch_gui_c::exit() not implemented yet."));
 }
 
@@ -565,9 +640,7 @@ void bx_switch_gui_c::vga_draw_char(int x, int y, char c)
   const bx_fontcharbitmap_t letter = bx_vgafont[c];
   uint32_t xp,yp = 0;
 
-  u32 width = 0;
-  u8 *fb = gfxGetFramebuffer(&width, NULL);
-  u32 *fb32 = (u32*)fb;
+  u32 width = 1280; // TODO: hack, should be guest_fb_width
 
   for(yp=0 ; yp < 16; yp++)
   {
@@ -577,11 +650,11 @@ void bx_switch_gui_c::vga_draw_char(int x, int y, char c)
       uint32_t xx = (x * 8) + xp;
       if(letter.data[yp] & (1 << xp))
       {
-        fb32[ind + xx] = vga_fg;
+        guest_fb[ind + xx] = vga_fg;
       }
       else
       {
-        fb32[ind + xx] = vga_bg;
+        guest_fb[ind + xx] = vga_bg;
       }
     }
   }
@@ -591,7 +664,7 @@ void bx_switch_gui_c::vga_draw_char(int x, int y, char c)
 void bx_switch_gui_c::show_ips(Bit32u ips_count)
 {
   ips_count /= 1000;
-  sprintf(ips_text, "%u.%3.3u", ips_count / 1000, ips_count % 1000);
+  sprintf(ips_text, "IPS: %u.%3.3u", ips_count / 1000, ips_count % 1000);
 }
 #endif
 

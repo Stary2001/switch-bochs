@@ -33,7 +33,7 @@ static inline bool FontLoadGlyph(glyph_t* glyph, const ffnt_header_t* font, uint
     return true;
 }
 
-static void DrawGlyph(uint32_t x, uint32_t y, color_t clr, const glyph_t* glyph)
+static void DrawGlyph(uint8_t *fb, uint32_t fb_w, uint32_t x, uint32_t y, color_t clr, const glyph_t* glyph)
 {
     uint32_t i, j;
     const uint8_t* data = glyph->data;
@@ -46,7 +46,7 @@ static void DrawGlyph(uint32_t x, uint32_t y, color_t clr, const glyph_t* glyph)
         {
             clr.a = *data++;
             if (!clr.a) continue;
-            DrawPixel(x+i, y+j, clr);
+            DrawPixel(fb, fb_w, x+i, y+j, clr);
         }
     }
 }
@@ -118,7 +118,7 @@ static inline uint32_t DecodeUTF8(const char** ptr)
     return 0xFFFD;
 }
 
-static void DrawText_(const ffnt_header_t* font, uint32_t x, uint32_t y, color_t clr, const char* text, uint32_t max_width, const char* end_text)
+static void DrawText_(uint8_t *fb, uint32_t fb_w, const ffnt_header_t* font, uint32_t x, uint32_t y, color_t clr, const char* text, uint32_t max_width, const char* end_text)
 {
     //__builtin_printf("DrawText %u %u %08X %s\n", (unsigned int)x, (unsigned int)y, (unsigned int)clr.abgr, text);
     y += font->baseline;
@@ -152,17 +152,17 @@ static void DrawText_(const ffnt_header_t* font, uint32_t x, uint32_t y, color_t
                 continue;
         }
 
-        DrawGlyph(x, y, clr, &glyph);
+        DrawGlyph(fb, fb_w, x, y, clr, &glyph);
         x += glyph.advance;
     }
 }
 
-void DrawText(const ffnt_header_t* font, uint32_t x, uint32_t y, color_t clr, const char* text)
+void DrawText(uint8_t *fb, uint32_t fb_w, const ffnt_header_t* font, uint32_t x, uint32_t y, color_t clr, const char* text)
 {
-    DrawText_(font, x, y, clr, text, 0, NULL);
+    DrawText_(fb, fb_w, font, x, y, clr, text, 0, NULL);
 }
 
-void DrawTextTruncate(const ffnt_header_t* font, uint32_t x, uint32_t y, color_t clr, const char* text, uint32_t max_width, const char* end_text)
+void DrawTextTruncate(uint8_t *fb, uint32_t fb_w, const ffnt_header_t* font, uint32_t x, uint32_t y, color_t clr, const char* text, uint32_t max_width, const char* end_text)
 {
-    DrawText_(font, x, y, clr, text, max_width, end_text);
+    DrawText_(fb, fb_w, font, x, y, clr, text, max_width, end_text);
 }
