@@ -103,15 +103,6 @@ extern "C" void libswitch_gui_plugin_fini()
 
 #define LOG_THIS theGui->
 
-// This file defines stubs for the GUI interface, which is a
-// place to start if you want to port bochs to a platform, for
-// which there is no support for your native GUI, or if you want to compile
-// bochs without any native GUI support (no output window or
-// keyboard input will be possible).
-// Look in 'x.cc', 'carbon.cc', and 'win32.cc' for specific
-// implementations of this interface.  -Kevin
-
-
 // ::SPECIFIC_INIT()
 //
 // Called from gui.cc, once upon program startup, to allow for the
@@ -146,35 +137,41 @@ void bx_switch_gui_c::specific_init(int argc, char **argv, unsigned headerbar_y)
   show_ips(100000);
 }
 
-
 // ::HANDLE_EVENTS()
 //
 // Called periodically (every 1 virtual millisecond) so the
 // the gui code can poll for keyboard, mouse, and other
 // relevant events.
 
+#include "switch_key_map.h"
+
 void bx_switch_gui_c::handle_events(void)
 {
+  int i;
+
   hidScanInput();
-  u64 kDown = hidKeysDown(CONTROLLER_P1_AUTO);
-  u64 kUp = hidKeysUp(CONTROLLER_P1_AUTO);
 
-  u32 keycodes[] = {BX_KEY_LEFT, BX_KEY_RIGHT, BX_KEY_UP, BX_KEY_DOWN, BX_KEY_ENTER};
-  u64 keys[] = {KEY_DLEFT, KEY_DRIGHT, KEY_DUP, KEY_DDOWN, KEY_X};
-
-  for(int i = 0; i < 5; i++)
+  for(i = KBD_A; i < KBD_MEDIA_CALC; i++)
   {
-    if(kDown & keys[i])
+    if(hidKeyboardDown((HidKeyboardScancode)i))
     {
-      fprintf(stderr, "keycode %d\n", i);
-      DEV_kbd_gen_scancode(keycodes[i]);
+      DEV_kbd_gen_scancode(bochs_keys[i]);
     }
-    if(kUp & keys[i])
+    else if(hidKeyboardUp((HidKeyboardScancode)i))
     {
-      fprintf(stderr, "keycode %d up\n", i);
-      DEV_kbd_gen_scancode(keycodes[i] | BX_KEY_RELEASED);
+      DEV_kbd_gen_scancode(bochs_keys[i] | BX_KEY_RELEASED);
     }
   }
+
+  mouse_button_state |= hidMouseButtonsDown() & 0x7;
+  mouse_button_state &= ~(hidMouseButtonsUp() & 0x7);
+
+  MousePosition mouse;
+  hidMouseRead(&mouse);
+  DEV_mouse_motion(mouse.velocityX, mouse.velocityY, 0, mouse_button_state, 0);
+
+  u64 kDown = hidKeysDown(CONTROLLER_P1_AUTO);
+  u64 kUp = hidKeysUp(CONTROLLER_P1_AUTO);
 
   if(kDown & KEY_A)
   {
@@ -182,7 +179,7 @@ void bx_switch_gui_c::handle_events(void)
   }
   if(kDown & KEY_B)
   {
-    mouse_button_state |= (1<<1);
+    mouse_button_state |= 2;;
   }
 
   if(kUp & KEY_A)
@@ -191,13 +188,12 @@ void bx_switch_gui_c::handle_events(void)
   }
   if(kDown & KEY_B)
   {
-    mouse_button_state &= (1<<1);
+    mouse_button_state &= 2;
   }
 
   JoystickPosition p;
   hidJoystickRead(&p, CONTROLLER_P1_AUTO, JOYSTICK_RIGHT);
-  if(p.dx != 0 || p.dy != 0)
-    fprintf(stderr, "%0.2f %0.2f\n", p.dx / (float)JOYSTICK_MAX , p.dy/(float)JOYSTICK_MAX );
+
   DEV_mouse_motion((p.dx / (float)JOYSTICK_MAX) * 10.0f , (p.dy/(float)JOYSTICK_MAX)*10.0f, 0, mouse_button_state, 0);
 }
 
@@ -663,8 +659,14 @@ void bx_switch_gui_c::vga_draw_char(int x, int y, char c)
 #if BX_SHOW_IPS
 void bx_switch_gui_c::show_ips(Bit32u ips_count)
 {
-  ips_count /= 1000;
-  sprintf(ips_text, "IPS: %u.%3.3u", ips_count / 1000, ips_count % 1000);
+  if(ips_count > 1000000)
+  {
+    sprintf(ips_text, "IPS: %3.3fM", ips_count / 1000000.0);
+  }
+  else
+  {
+    sprintf(ips_text, "IPS: %3.3fK", ips_count / 1000.0);
+  }
 }
 #endif
 
