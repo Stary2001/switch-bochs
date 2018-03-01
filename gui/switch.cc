@@ -134,7 +134,7 @@ void bx_switch_gui_c::specific_init(int argc, char **argv, unsigned headerbar_y)
 
   clear_screen();
   memset(ips_text, 0, sizeof(ips_text));
-  show_ips(100000);
+  show_ips(0);
 }
 
 // ::HANDLE_EVENTS()
