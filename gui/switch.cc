@@ -145,56 +145,60 @@ void bx_switch_gui_c::specific_init(int argc, char **argv, unsigned headerbar_y)
 
 #include "switch_key_map.h"
 
+bool use_real_devices = true;
 void bx_switch_gui_c::handle_events(void)
 {
-  int i;
-
   hidScanInput();
 
-  for(i = KBD_A; i < KBD_MEDIA_CALC; i++)
+  if(use_real_devices)
   {
-    if(hidKeyboardDown((HidKeyboardScancode)i))
+    for(int i = KBD_A; i < KBD_MEDIA_CALC; i++)
     {
-      DEV_kbd_gen_scancode(bochs_keys[i]);
+      if(hidKeyboardDown((HidKeyboardScancode)i))
+      {
+        DEV_kbd_gen_scancode(bochs_keys[i]);
+      }
+      else if(hidKeyboardUp((HidKeyboardScancode)i))
+      {
+        DEV_kbd_gen_scancode(bochs_keys[i] | BX_KEY_RELEASED);
+      }
     }
-    else if(hidKeyboardUp((HidKeyboardScancode)i))
+
+    mouse_button_state |= hidMouseButtonsDown() & 0x7;
+    mouse_button_state &= ~(hidMouseButtonsUp() & 0x7);
+
+    MousePosition mouse;
+    hidMouseRead(&mouse);
+    DEV_mouse_motion(mouse.velocityX, mouse.velocityY, mouse.scrollVelocityX, mouse_button_state, 0);
+  }
+  else
+  {
+    u64 kDown = hidKeysDown(CONTROLLER_P1_AUTO);
+    u64 kUp = hidKeysUp(CONTROLLER_P1_AUTO);
+
+    if(kDown & KEY_A)
     {
-      DEV_kbd_gen_scancode(bochs_keys[i] | BX_KEY_RELEASED);
+      mouse_button_state |= 1;
     }
+    if(kDown & KEY_B)
+    {
+      mouse_button_state |= 2;;
+    }
+
+    if(kUp & KEY_A)
+    {
+      mouse_button_state &= 1;
+    }
+    if(kDown & KEY_B)
+    {
+      mouse_button_state &= 2;
+    }
+
+    JoystickPosition p;
+    hidJoystickRead(&p, CONTROLLER_P1_AUTO, JOYSTICK_RIGHT);
+
+    DEV_mouse_motion((p.dx / (float)JOYSTICK_MAX) * 10.0f , (p.dy/(float)JOYSTICK_MAX)*10.0f, 0, mouse_button_state, 0);
   }
-
-  mouse_button_state |= hidMouseButtonsDown() & 0x7;
-  mouse_button_state &= ~(hidMouseButtonsUp() & 0x7);
-
-  MousePosition mouse;
-  hidMouseRead(&mouse);
-  DEV_mouse_motion(mouse.velocityX, mouse.velocityY, 0, mouse_button_state, 0);
-
-  u64 kDown = hidKeysDown(CONTROLLER_P1_AUTO);
-  u64 kUp = hidKeysUp(CONTROLLER_P1_AUTO);
-
-  if(kDown & KEY_A)
-  {
-    mouse_button_state |= 1;
-  }
-  if(kDown & KEY_B)
-  {
-    mouse_button_state |= 2;;
-  }
-
-  if(kUp & KEY_A)
-  {
-    mouse_button_state &= 1;
-  }
-  if(kDown & KEY_B)
-  {
-    mouse_button_state &= 2;
-  }
-
-  JoystickPosition p;
-  hidJoystickRead(&p, CONTROLLER_P1_AUTO, JOYSTICK_RIGHT);
-
-  DEV_mouse_motion((p.dx / (float)JOYSTICK_MAX) * 10.0f , (p.dy/(float)JOYSTICK_MAX)*10.0f, 0, mouse_button_state, 0);
 }
 
 extern "C"
@@ -362,7 +366,8 @@ void bx_switch_gui_c::text_update(Bit8u *old_text, Bit8u *new_text,
       && (tm_info->cs_start <= tm_info->cs_end)) {
     if(cursor_x>0)
       cursor_x--;
-    else {
+    else if(cursor_y > 0)
+    {
       cursor_x=25-1;
       cursor_y--;
     }
@@ -644,6 +649,7 @@ void bx_switch_gui_c::vga_draw_char(int x, int y, char c)
     for(xp=0; xp < 8; xp++)
     {
       uint32_t xx = (x * 8) + xp;
+
       if(letter.data[yp] & (1 << xp))
       {
         guest_fb[ind + xx] = vga_fg;
