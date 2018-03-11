@@ -33,6 +33,24 @@
 #include "icon_bochs.h"
 #include "font/vga.bitmap.h"
 
+#define MAX_BITMAP 32
+#define MAX_HEADERBAR 16
+
+struct bitmap
+{
+  int id;
+  int x;
+  int y;
+  uint32_t *buff;
+};
+
+struct headerbar_entry
+{
+  int id;
+  int bmap;
+  void (*func)(void);
+};
+
 class bx_switch_gui_c : public bx_gui_c {
 public:
   bx_switch_gui_c (void) {}
@@ -61,6 +79,16 @@ public:
   u32 *guest_fb;
   u32 guest_fb_height;
   u32 guest_fb_width;
+
+  bitmap bitmaps[MAX_BITMAP];
+  int curr_bitmap;
+
+  headerbar_entry headerbar[MAX_HEADERBAR];
+  int headerbar_order[MAX_HEADERBAR];
+  int headerbar_len;
+  int headerbar_num_left;
+
+  int headerbar_size;
 };
 
 #if BX_SHOW_IPS
@@ -130,10 +158,19 @@ void bx_switch_gui_c::specific_init(int argc, char **argv, unsigned headerbar_y)
     BX_INFO(("private_colormap option ignored."));
   }
 
+  curr_bitmap = 0;
+  headerbar_len = 0;
+  headerbar_num_left = 0;
+  headerbar_size = headerbar_y;
+
   guest_fb = (u32*)malloc(1280 * 720 * 4);
 
   clear_screen();
   memset(ips_text, 0, sizeof(ips_text));
+  memset(headerbar, 0, sizeof(headerbar));
+  memset(headerbar_order, 0, sizeof(headerbar_order));
+  memset(bitmaps, 0, sizeof(bitmaps));
+
   show_ips(0);
 
   SIM->get_param_bool(BXPN_MOUSE_ENABLED)->set(true);
@@ -201,6 +238,28 @@ void bx_switch_gui_c::handle_events(void)
 
     DEV_mouse_motion((p.dx / (float)JOYSTICK_MAX) * 10.0f , (p.dy/(float)JOYSTICK_MAX)*10.0f, 0, mouse_button_state, 0);
   }
+
+  if(hidTouchCount() > 0)
+  {
+    touchPosition pos;
+    hidTouchRead(&pos, 0);
+    if(pos.py <= headerbar_size)
+    {
+      int curr_x = 0;
+
+      for(int i = 0; i < headerbar_len; i++)
+      {
+        headerbar_entry *e = &headerbar[headerbar_order[i]];
+        bitmap *b = &bitmaps[e->bmap];
+        if(pos.px >= curr_x && pos.px <= curr_x + b->x)
+        {
+          e->func();
+          break;
+        }
+        curr_x += b->x;
+      }
+    }
+  }
 }
 
 extern "C"
@@ -241,7 +300,7 @@ void bx_switch_gui_c::flush(void)
   {
     for(x = 0; x < guest_xres; x++)
     {
-      real_fb[y * width + x] = guest_fb[y * guest_xres + x];
+      real_fb[(y+headerbar_size) * width + x] = guest_fb[y * guest_xres + x];
     }
   }
 
@@ -251,7 +310,7 @@ void bx_switch_gui_c::flush(void)
   {
     for(x = 0; x < console_framebuf_width; x++)
     {
-      real_fb[y * width + x] = Blend(u32_console_framebuf[y * console_framebuf_width + x], real_fb[y * width + x]);
+      real_fb[(y+headerbar_size) * width + x] = Blend(u32_console_framebuf[y * console_framebuf_width + x], real_fb[(y+headerbar_size) * width + x]);
     }
   }
 
@@ -282,7 +341,7 @@ void bx_switch_gui_c::clear_screen(void)
 {
   u32 width, height;
   u8 *fb = gfxGetFramebuffer(NULL, NULL);
-  memset(fb, 0, gfxGetFramebufferSize());
+  memset(fb + 1280 * headerbar_size * 4, 0, gfxGetFramebufferSize() - 1280 * headerbar_size * 4);
   gfxFlushBuffers();
 }
 
@@ -558,12 +617,31 @@ void bx_switch_gui_c::dimension_update(unsigned x, unsigned y, unsigned fheight,
 // xdim: x dimension of bitmap
 // ydim: y dimension of bitmap
 
-unsigned bx_switch_gui_c::create_bitmap(const unsigned char *bmap, unsigned xdim, unsigned ydim)
+unsigned bx_switch_gui_c::create_bitmap(const unsigned char *packed, unsigned xdim, unsigned ydim)
 {
-  UNUSED(bmap);
-  UNUSED(xdim);
-  UNUSED(ydim);
-  return(0);
+  int new_id = curr_bitmap++;
+  memset(&bitmaps[new_id], 0, sizeof(bitmap));
+
+  bitmaps[new_id].x = xdim;
+  bitmaps[new_id].y = ydim;
+  bitmaps[new_id].id = new_id;
+  bitmaps[new_id].buff = (uint32_t*) malloc(xdim * ydim * 4);
+  uint32_t *bitmap_fb = bitmaps[new_id].buff;
+
+  int off = 0;
+  for(int y = 0; y < ydim; y++)
+  {
+    for(int x = 0; x < xdim; x+=8)
+    {
+      for(int i = 0; i < 8; i++)
+      {
+        bitmap_fb[y * xdim + x + i] = (packed[off] & (1 << i)) != 0 ? 0xffffffff : 0;
+      }
+      off++;
+    }
+  }
+
+  return new_id;
 }
 
 
@@ -583,10 +661,24 @@ unsigned bx_switch_gui_c::create_bitmap(const unsigned char *bmap, unsigned xdim
 
 unsigned bx_switch_gui_c::headerbar_bitmap(unsigned bmap_id, unsigned alignment, void (*f)(void))
 {
-  UNUSED(bmap_id);
-  UNUSED(alignment);
-  UNUSED(f);
-  return(0);
+  if(headerbar_len == MAX_HEADERBAR - 1) return -1;
+  int id = headerbar_len++;
+
+  headerbar[id].id = id;
+  headerbar[id].bmap = bmap_id;
+  headerbar[id].func = f;
+
+  if(headerbar_num_left > 0)
+  {
+    memmove(headerbar_order + headerbar_num_left + 1, headerbar_order + headerbar_num_left, (headerbar_len - headerbar_num_left - 1) * sizeof(int));
+  }
+  headerbar_order[headerbar_num_left] = id;
+
+  if(alignment == BX_GRAVITY_LEFT)
+  {
+    headerbar_num_left++;
+  }
+  return id;
 }
 
 
@@ -597,6 +689,26 @@ unsigned bx_switch_gui_c::headerbar_bitmap(unsigned bmap_id, unsigned alignment,
 
 void bx_switch_gui_c::show_headerbar(void)
 {
+  u32 width;
+  u32 *real_fb = (u32*)gfxGetFramebuffer(&width, NULL);
+
+  int curr_x = 0;
+
+  for(int i = 0; i < headerbar_len; i++)
+  {
+    headerbar_entry *e = &headerbar[headerbar_order[i]];
+    bitmap *b = &bitmaps[e->bmap];
+
+    for(int y = 0; y < b->y; y++)
+    {
+      for(int x = 0; x < b->x; x++)
+      {
+        real_fb[y * width + curr_x + x] = b->buff[y * b->x + x];
+      }
+    }
+
+    curr_x += b->x;
+  }
 }
 
 
@@ -615,8 +727,7 @@ void bx_switch_gui_c::show_headerbar(void)
 
 void bx_switch_gui_c::replace_bitmap(unsigned hbar_id, unsigned bmap_id)
 {
-  UNUSED(hbar_id);
-  UNUSED(bmap_id);
+  headerbar[hbar_id].bmap = bmap_id;
 }
 
 
