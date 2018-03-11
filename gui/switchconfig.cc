@@ -168,10 +168,10 @@ int current_line = 0;
 struct console_line console_lines[N_LINES];
 
 int console_y = 0;
-uint8_t* g_framebuf;
-u32 g_framebuf_width;
-u32 g_framebuf_stride;
-u32 g_framebuf_height;
+uint8_t* console_framebuf;
+u32 console_framebuf_width;
+u32 console_framebuf_stride;
+u32 console_framebuf_height;
 
 bool flush_called = false;
 
@@ -190,7 +190,7 @@ int console_tick()
       {
         for(x = 0; x < 1280*4; x+=4)
         {
-          g_framebuf[y * g_framebuf_stride + x + 3] = (stage * 255) / N_LINES; // Set the alpha!
+          console_framebuf[y * console_framebuf_stride + x + 3] = (stage * 255) / N_LINES; // Set the alpha!
         }
       }
     }
@@ -239,21 +239,21 @@ BxEvent* switch_notify_callback(void *unused, BxEvent *event)
         current_line = 0;
       }
 
-      int line_bytes = g_framebuf_stride * line_height;
-      memmove(g_framebuf + line_bytes, g_framebuf, g_framebuf_stride * (g_framebuf_height - line_height));
-      memset(g_framebuf, 0, line_bytes);
+      int line_bytes = console_framebuf_stride * line_height;
+      memmove(console_framebuf + line_bytes, console_framebuf, console_framebuf_stride * (console_framebuf_height - line_height));
+      memset(console_framebuf, 0, line_bytes);
 
       for(int i = current_line; i < current_line+N_LINES-1; i++)
       {
         console_lines[i % N_LINES].y += line_height;
       }
 
-      DrawText(g_framebuf, g_framebuf_width, tahoma12, 0, 0, MakeColor(255, 255, 255, 255), event->u.logmsg.msg);
+      DrawText(console_framebuf, console_framebuf_width, tahoma12, 0, 0, MakeColor(255, 255, 255, 255), event->u.logmsg.msg);
 
       if(!flush_called) // lol hack
       {
         u8 *real_fb = gfxGetFramebuffer(NULL, NULL);
-        memcpy(real_fb, g_framebuf, g_framebuf_height * g_framebuf_stride);
+        memcpy(real_fb + (32*1280 * 4), console_framebuf, console_framebuf_height * console_framebuf_stride); // todo: hack (for fucks sake)
         gfxFlushBuffers();
         gfxSwapBuffers();
       }
@@ -289,10 +289,10 @@ static int ci_callback(void *userdata, ci_command_t command)
 
 int init_switch_config_interface()
 {
-  g_framebuf_width = 1280;
-  g_framebuf_stride = g_framebuf_width * 4;
-  g_framebuf_height = (tahoma12->height + 2) * N_LINES;
-  g_framebuf = (uint8_t*)malloc(g_framebuf_stride * g_framebuf_height * 2);
+  console_framebuf_width = 1280;
+  console_framebuf_stride = console_framebuf_width * 4;
+  console_framebuf_height = (tahoma12->height + 2) * N_LINES;
+  console_framebuf = (uint8_t*)malloc(console_framebuf_stride * console_framebuf_height * 2);
 
   SIM->register_configuration_interface("switch", ci_callback, NULL);
   return 0;  // success

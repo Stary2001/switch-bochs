@@ -135,6 +135,8 @@ void bx_switch_gui_c::specific_init(int argc, char **argv, unsigned headerbar_y)
   clear_screen();
   memset(ips_text, 0, sizeof(ips_text));
   show_ips(0);
+
+  SIM->get_param_bool(BXPN_MOUSE_ENABLED)->set(true);
 }
 
 // ::HANDLE_EVENTS()
@@ -210,10 +212,10 @@ extern "C"
 // Called periodically, requesting that the gui code flush all pending
 // screen update requests.
 
-extern uint8_t* g_framebuf;
-extern u32 g_framebuf_width;
-extern u32 g_framebuf_stride;
-extern u32 g_framebuf_height;
+extern uint8_t* console_framebuf;
+extern u32 console_framebuf_width;
+extern u32 console_framebuf_stride;
+extern u32 console_framebuf_height;
 extern bool flush_called;
 
 static inline uint32_t Blend(uint32_t dst, uint32_t src) // Blend 'dst' onto 'src'. Uses the dst alpha.
@@ -232,16 +234,24 @@ void bx_switch_gui_c::flush(void)
 
   u32 width;
   u32 *real_fb = (u32*)gfxGetFramebuffer(&width, NULL);
-  memcpy(real_fb, guest_fb, 1280 * 720 * 4); // hack hack
 
-  u32 *u32_g_framebuf = (u32*)g_framebuf;
+  int x,y;
 
-  int x, y;
-  for(y = 0; y < g_framebuf_height; y++)
+  for(y = 0; y < guest_yres; y++) // copy in the guest fb.
   {
-    for(x = 0; x < g_framebuf_width; x++)
+    for(x = 0; x < guest_xres; x++)
     {
-      real_fb[y * width + x] = Blend(u32_g_framebuf[y * g_framebuf_width + x], real_fb[y * width + x]);
+      real_fb[y * width + x] = guest_fb[y * guest_xres + x];
+    }
+  }
+
+  u32 *u32_console_framebuf = (u32*)console_framebuf;
+
+  for(y = 0; y < console_framebuf_height; y++)
+  {
+    for(x = 0; x < console_framebuf_width; x++)
+    {
+      real_fb[y * width + x] = Blend(u32_console_framebuf[y * console_framebuf_width + x], real_fb[y * width + x]);
     }
   }
 
@@ -250,11 +260,11 @@ void bx_switch_gui_c::flush(void)
   {
     for(x = guest_xres; x < guest_xres + 200; x++)
     {
-      real_fb[y * 1280 + x] = 0; // hack hack
+      real_fb[y * width + x] = 0;
     }
   }
 
-  DrawText((u8*)real_fb, 1280, tahoma12, guest_xres, 0, MakeColor(255, 255, 255, 255), ips_text); // hack hackk
+  DrawText((u8*)real_fb, width, tahoma12, guest_xres, 0, MakeColor(255, 255, 255, 255), ips_text);
 #endif
 
   gfxFlushBuffers();
@@ -494,7 +504,7 @@ void bx_switch_gui_c::graphics_tile_update(Bit8u *tile, unsigned x0, unsigned y0
     
     for(x = 0; x < x_tilesize; x++)
     {
-      int ind = (y0 + y) * 1280 + x + x0; // TODO: hack, should be guest_fb_width
+      int ind = (y0 + y) * guest_xres + x + x0;
       guest_fb[ind] = palette[tile[i]];
       i++;
     }
@@ -641,11 +651,9 @@ void bx_switch_gui_c::vga_draw_char(int x, int y, char c)
   const bx_fontcharbitmap_t letter = bx_vgafont[c];
   uint32_t xp,yp = 0;
 
-  u32 width = 1280; // TODO: hack, should be guest_fb_width
-
   for(yp=0 ; yp < 16; yp++)
   {
-    int ind = (y * 16 + yp) * width;
+    int ind = (y * 16 + yp) * guest_xres;
     for(xp=0; xp < 8; xp++)
     {
       uint32_t xx = (x * 8) + xp;
