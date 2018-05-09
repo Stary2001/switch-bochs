@@ -3398,9 +3398,9 @@ case "$target" in
     CXX="$DEVKITPRO/devkitA64/bin/aarch64-none-elf-g++"
 
     HEADER_PATHS="-I$DEVKITPRO/libnx/include"
-    ARCH="-g -Wall -fomit-frame-pointer -ffunction-sections -march=armv8-a -mtp=soft -fPIE"
+    ARCH="-O3 -Wall -fomit-frame-pointer -ffunction-sections -march=armv8-a -mtp=soft -fPIE"
     CXXFLAGS="$CXXFLAGS -fno-rtti -fno-exceptions"
-    LIBPATHS="-L$DEVKITPRO/libnx/lib -L$DEKVITPRO/portlibs/switch/lib -L$DEKVITPRO/portlibs/armv8-a/lib"
+    LIBPATHS="-L$DEVKITPRO/libnx/lib -L$DEVKITPRO/portlibs/switch/lib -L$DEVKITPRO/portlibs/armv8-a/lib"
     EXTRA_LINK_OPTS="$LIBPATHS -specs=$DEVKITPRO/libnx/switch.specs $ARCH"
 
     ADD_FLAGS="$ARCH -DSWITCH $HEADER_PATHS $LIBPATHS"
